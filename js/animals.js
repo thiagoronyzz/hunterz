@@ -440,7 +440,7 @@
               if (this.type === 'wolf') this.mgr.audio.snarl(this.pos, false); else this.mgr.audio.snarl(this.pos, true);
             }
           }
-          if (this.attackT > wind + 0.4) { this.attackCd = sp.cd * (0.85 + Math.random() * 0.3); this.state = this.wasCharge ? 'charge' : 'chase'; this.stateT = this.wasCharge ? 22 : 30; if (this.wasCharge) { this.overrun = 1.1; } }
+          if (this.attackT > wind + 0.4) { this.attackCd = sp.cd * (0.85 + Math.random() * 0.3); this.state = this.wasCharge ? 'charge' : 'chase'; this.stateT = this.wasCharge ? 22 : 30; if (this.wasCharge) { this.overrun = 1.1; this.heading += (Math.random() < 0.5 ? 1 : -1) * 0.55; this.attackCd = Math.max(this.attackCd, 2.2); } }
           break;
         }
       }
