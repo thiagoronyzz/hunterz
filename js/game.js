@@ -16,8 +16,29 @@
     pause: $('pauseScreen'), resume: $('resumeButton'), rainPause: $('rainPauseButton'), restart: $('restartButton'),
     death: $('deathScreen'), deathCause: $('deathCause'), deathStats: $('deathStats'), retry: $('retryButton'),
     end: $('endScreen'), finalKills: $('finalKills'), finalAccuracy: $('finalAccuracy'), finalTime: $('finalTime'), rankingEntry: $('rankingEntry'), notQualified: $('notQualified'), playerName: $('playerName'), saveRank: $('saveRankButton'), rankMessage: $('rankMessage'), playAgain: $('playAgainButton'),
-    loading: $('loadingScreen'), loadFill: $('loadFill'), loadMsg: $('loadMsg'), unsupported: $('unsupported'),
+    loading: $('loadingScreen'), loadFill: $('loadFill'), loadMsg: $('loadMsg'), loadError: $('loadError'), loadErrorDetail: $('loadErrorDetail'), retryLow: $('retryLowButton'), unsupported: $('unsupported'),
   };
+  let lowRetryBound = false;
+  const retryAtLow = () => {
+    try { localStorage.setItem('hunterz-quality', 'baixa'); } catch (_) {}
+    const retryUrl = new URL(location.href);
+    retryUrl.searchParams.set('q', 'baixa');
+    location.replace(retryUrl.href);
+  };
+  const showLoadError = (error) => {
+    console.error('Falha ao iniciar Hunterz:', error);
+    UI.loading.classList.remove('hidden');
+    UI.loadFill.style.width = '100%';
+    UI.loadMsg.textContent = 'Não foi possível preparar a floresta nesta qualidade.';
+    UI.loadErrorDetail.textContent = error && error.message ? error.message.slice(0, 180) : 'O dispositivo não conseguiu reservar recursos para esta configuração.';
+    UI.loadError.classList.remove('hidden');
+    if (!lowRetryBound) {
+      UI.retryLow.addEventListener('click', retryAtLow, { once: true });
+      lowRetryBound = true;
+    }
+  };
+
+  try {
   const params = new URLSearchParams(location.search);
   const setLoading = (p, msg) => { UI.loadFill.style.width = Math.round(p * 100) + '%'; if (msg) UI.loadMsg.textContent = msg; };
   const tick = () => new Promise(r => setTimeout(r, 20));
@@ -28,25 +49,73 @@
   let quality = params.get('q') || localStorage.getItem(QKEY) || (isMobile ? 'baixa' : 'media');
   if (!HZ.QUALITY[quality]) quality = 'media';
   UI.quality.value = quality;
-  UI.quality.addEventListener('change', () => { try { localStorage.setItem(QKEY, UI.quality.value); } catch (_) {} location.reload(); });
+  UI.quality.addEventListener('change', () => {
+    try { localStorage.setItem(QKEY, UI.quality.value); } catch (_) {}
+    const nextUrl = new URL(location.href);
+    nextUrl.searchParams.set('q', UI.quality.value);
+    location.assign(nextUrl.href);
+  });
 
   const test = document.createElement('canvas');
   if (!test.getContext('webgl2')) { UI.loading.classList.add('hidden'); UI.unsupported.classList.remove('hidden'); return; }
 
   // ---------------------------------------------------------------- renderizador
-  const q = HZ.QUALITY[quality];
+  // Orçamentos por dispositivo: MSAA em um render target HDR de tela cheia pode
+  // reservar centenas de MB em telas grandes; sombras também respeitam o limite da GPU.
+  const q = { ...HZ.QUALITY[quality] };
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatio));
+  const memoryGB = Number(navigator.deviceMemory) || 0;
+  const cores = Number(navigator.hardwareConcurrency) || 0;
+  const constrainedDevice = isMobile || (memoryGB > 0 && memoryGB <= 4) || (cores > 0 && cores <= 4);
+  if (constrainedDevice && quality !== 'baixa') {
+    const high = quality === 'alta';
+    Object.assign(q, {
+      variants: 2,
+      treeStep: Math.max(q.treeStep, high ? 6.0 : 6.2),
+      treeNear: Math.min(q.treeNear, high ? 100 : 85),
+      grassD: Math.min(q.grassD, high ? 2.0 : 1.5),
+      grassR: Math.min(q.grassR, high ? 40 : 34),
+      fern: Math.min(q.fern, high ? 5000 : 3500),
+      fernR: Math.min(q.fernR, high ? 55 : 45),
+      bush: Math.min(q.bush, high ? 1100 : 850),
+      sapling: Math.min(q.sapling, high ? 700 : 500),
+      twigs: Math.min(q.twigs, high ? 1800 : 1400),
+      stones: Math.min(q.stones, high ? 1800 : 1400),
+      mushrooms: Math.min(q.mushrooms, high ? 650 : 500),
+    });
+  }
+  const screenPixels = Math.max(1, window.innerWidth * window.innerHeight);
+  const pixelBudget = constrainedDevice ? 2_600_000 : 8_000_000;
+  const pixelRatio = Math.min(
+    window.devicePixelRatio || 1,
+    q.pixelRatio,
+    Math.sqrt(pixelBudget / screenPixels),
+  );
+  q.pixelRatio = Math.max(0.5, pixelRatio);
+  q.shadow = Math.min(q.shadow, renderer.capabilities.maxTextureSize || q.shadow);
+  const targetPixels = screenPixels * q.pixelRatio * q.pixelRatio;
+  const heavyFrame = targetPixels > 2_400_000 || constrainedDevice;
+  if (targetPixels > 4_000_000 || constrainedDevice) q.shadow = Math.min(q.shadow, 2048);
+  q.samples = heavyFrame ? 0 : Math.min(q.samples, renderer.capabilities.maxSamples || 0);
+  if (heavyFrame) q.bloom = false;
+  HZ.QUALITY[quality] = q;
+  renderer.setPixelRatio(q.pixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.NoToneMapping;
   UI.scene.appendChild(renderer.domElement);
+  renderer.domElement.addEventListener('webglcontextlost', (event) => {
+    event.preventDefault();
+    showLoadError(new Error('O contexto WebGL foi interrompido; tente novamente em qualidade baixa.'));
+  });
   HZ.maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
-  setLoading(0.03, 'Gerando texturas da floresta');
+  const adaptedQuality = constrainedDevice && quality !== 'baixa';
+  const textureQuality = constrainedDevice && quality === 'alta' ? 'media' : quality;
+  setLoading(0.03, adaptedQuality ? 'Otimizando a floresta para este dispositivo' : 'Gerando texturas da floresta');
   await tick();
-  HZ.textures.build(quality);
+  HZ.textures.build(textureQuality);
   HZ.textures.toThree();
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 2400);
@@ -580,4 +649,7 @@
   // modos de teste/preview via URL (?preview=animals|play)
   HZ.game = { stepFrames, P, S, animals, world, camera, startGame, damagePlayer, shoot, effects, rifle, scene, renderer, setRain };
   if (params.get('rain') === '1') setRain(true);
+  } catch (error) {
+    showLoadError(error);
+  }
 })();
