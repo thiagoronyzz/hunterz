@@ -38,7 +38,9 @@
 
   // ---------------------------------------------------------------- SOLO
   T.build = function (quality) {
-    const S = quality === 'baixa' ? 256 : 512;
+    // Média usa resolução intermediária: reduz o tempo de geração procedural sem
+    // sacrificar nitidez perceptível no jogo. Alta mantém os mapas de 512 px.
+    const S = quality === 'baixa' ? 256 : quality === 'media' ? 384 : 512;
     const t0 = performance.now();
 
     // Grama rasteira / musgo
@@ -125,7 +127,7 @@
     }
 
     // Cascas de árvore
-    const barkSize = quality === 'baixa' ? [128, 256] : [256, 512];
+    const barkSize = quality === 'baixa' ? [128, 256] : quality === 'media' ? [192, 384] : [256, 512];
     T.barkPine = pixelCanvas(barkSize[0], barkSize[1], (u, v, x, y, o) => {
       const plates = ridged(u * 5, v * 2, 3, 61, 5), n = fbm(u * 12, v * 5, 3, 62, 12), flake = HZ.smooth(0.3, 0.7, fbm(u * 3, v * 3, 2, 63, 3));
       const fiss = Math.pow(plates, 4);
@@ -153,7 +155,7 @@
     });
 
     // --------------------------------------------------- FOLHAGEM (cor + alfa)
-    const F = quality === 'baixa' ? 256 : 512, kf = F / 512;
+    const F = quality === 'baixa' ? 256 : quality === 'media' ? 384 : 512, kf = F / 512;
 
     // Tufo de pinheiro (acículas longas)
     T.pine = dual(F, F, '#34431f', 101, (ctx, r, C) => {

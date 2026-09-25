@@ -30,7 +30,7 @@ body{font-family:Manrope,"Segoe UI",system-ui,sans-serif}
 .vignette{background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.08) 75%,rgba(0,0,0,.35) 120%)}
 #damageFlash{background:radial-gradient(circle,transparent 30%,rgba(120,0,0,.55));transition:opacity .35s}
 #bloodOverlay{position:absolute;inset:0;z-index:6;pointer-events:none;opacity:0;background-size:cover;background-position:center;mix-blend-mode:multiply;transition:opacity .6s}
-.loading-screen .loading-msg{margin-top:12px;font-size:8px;letter-spacing:.2em;color:#8f9b8c;min-height:12px}
+.loading-screen .loading-msg{margin-top:12px;font-size:8px;letter-spacing:.2em;color:#8f9b8c;min-height:12px}.loading-error{max-width:min(360px,calc(100vw - 40px));margin:22px auto 0;padding:16px;border:1px solid rgba(216,65,44,.45);background:rgba(70,12,8,.25);font:500 10px/1.6 Manrope;color:#e8c6bf}.loading-error button{display:block;margin:14px auto 0;padding:10px 14px;border:1px solid rgba(206,227,137,.5);background:#a8c841;color:#10170b;font:800 10px Barlow Condensed;letter-spacing:.12em;cursor:pointer}.loading-error button:hover{filter:brightness(1.1)}
 
 /* vida / estamina */
 .vitals{position:absolute;left:32px;bottom:180px;width:260px;display:flex;flex-direction:column;gap:7px}
