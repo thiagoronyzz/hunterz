@@ -60,10 +60,9 @@
   if (!test.getContext('webgl2')) { UI.loading.classList.add('hidden'); UI.unsupported.classList.remove('hidden'); return; }
 
   // ---------------------------------------------------------------- renderizador
-  // Orçamentos por dispositivo: MSAA em um render target HDR de tela cheia pode
-  // reservar centenas de MB em telas grandes; sombras também respeitam o limite da GPU.
+  // Orçamentos por dispositivo: MSAA HDR + sombra 4K engasgam; alta fica em 2K/MSAA 2x.
   const q = { ...HZ.QUALITY[quality] };
-  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
+  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, depth: true, alpha: false });
   const memoryGB = Number(navigator.deviceMemory) || 0;
   const cores = Number(navigator.hardwareConcurrency) || 0;
   const constrainedDevice = isMobile || (memoryGB > 0 && memoryGB <= 4) || (cores > 0 && cores <= 4);
@@ -72,38 +71,57 @@
     Object.assign(q, {
       variants: 2,
       treeStep: Math.max(q.treeStep, high ? 6.0 : 6.2),
-      treeNear: Math.min(q.treeNear, high ? 100 : 85),
-      grassD: Math.min(q.grassD, high ? 2.0 : 1.5),
-      grassR: Math.min(q.grassR, high ? 40 : 34),
-      fern: Math.min(q.fern, high ? 5000 : 3500),
-      fernR: Math.min(q.fernR, high ? 55 : 45),
-      bush: Math.min(q.bush, high ? 1100 : 850),
-      sapling: Math.min(q.sapling, high ? 700 : 500),
-      twigs: Math.min(q.twigs, high ? 1800 : 1400),
-      stones: Math.min(q.stones, high ? 1800 : 1400),
-      mushrooms: Math.min(q.mushrooms, high ? 650 : 500),
+      treeNear: Math.min(q.treeNear, high ? 90 : 80),
+      grassD: Math.min(q.grassD, high ? 1.8 : 1.4),
+      grassR: Math.min(q.grassR, high ? 36 : 30),
+      fern: Math.min(q.fern, high ? 4200 : 3000),
+      fernR: Math.min(q.fernR, high ? 48 : 40),
+      bush: Math.min(q.bush, high ? 900 : 700),
+      sapling: Math.min(q.sapling, high ? 550 : 400),
+      twigs: Math.min(q.twigs, high ? 1400 : 1000),
+      stones: Math.min(q.stones, high ? 1400 : 1000),
+      mushrooms: Math.min(q.mushrooms, high ? 500 : 400),
+      shadow: Math.min(q.shadow, 1024),
+      shadowR: Math.min(q.shadowR, high ? 48 : 42),
+      samples: 0,
+      bloom: false,
+      pixelRatio: Math.min(q.pixelRatio, 1.1),
     });
   }
   const screenPixels = Math.max(1, window.innerWidth * window.innerHeight);
-  const pixelBudget = constrainedDevice ? 2_600_000 : 8_000_000;
+  // Orçamento mais conservador em alta: evita stutter em monitores 1440p/4K
+  const pixelBudget = constrainedDevice ? 2_200_000 : (quality === 'alta' ? 5_500_000 : 7_000_000);
   const pixelRatio = Math.min(
     window.devicePixelRatio || 1,
     q.pixelRatio,
     Math.sqrt(pixelBudget / screenPixels),
   );
-  q.pixelRatio = Math.max(0.5, pixelRatio);
-  q.shadow = Math.min(q.shadow, renderer.capabilities.maxTextureSize || q.shadow);
+  q.pixelRatio = Math.max(0.5, Math.round(pixelRatio * 100) / 100);
+  const maxTex = renderer.capabilities.maxTextureSize || 4096;
+  // potências de 2 até 2048 (4K de sombra engasga e gera stutter)
+  const shadowCaps = [512, 1024, 2048];
+  const pickShadow = (want) => {
+    let best = 512;
+    for (const s of shadowCaps) if (s <= want && s <= maxTex) best = s;
+    return best;
+  };
+  q.shadow = pickShadow(q.shadow);
   const targetPixels = screenPixels * q.pixelRatio * q.pixelRatio;
-  const heavyFrame = targetPixels > 2_400_000 || constrainedDevice;
-  if (targetPixels > 4_000_000 || constrainedDevice) q.shadow = Math.min(q.shadow, 2048);
-  q.samples = heavyFrame ? 0 : Math.min(q.samples, renderer.capabilities.maxSamples || 0);
-  if (heavyFrame) q.bloom = false;
+  const heavyFrame = targetPixels > 2_200_000 || constrainedDevice || quality === 'baixa';
+  if (targetPixels > 3_500_000 || constrainedDevice) q.shadow = pickShadow(Math.min(q.shadow, 1024));
+  const maxSamples = renderer.capabilities.maxSamples || 0;
+  q.samples = heavyFrame ? 0 : Math.min(q.samples || 0, maxSamples, 2);
+  if (heavyFrame && quality !== 'alta') q.bloom = false;
+  // Em alta com frame pesado, mantém bloom leve mas desliga MSAA
+  if (quality === 'alta' && heavyFrame) { q.samples = 0; q.bloom = true; }
   HZ.QUALITY[quality] = q;
   renderer.setPixelRatio(q.pixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // PCF (sem Soft) é bem mais barato e reduz "manchas" de filtro amplo em folhas
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.NoToneMapping;
+  renderer.autoClear = true;
   UI.scene.appendChild(renderer.domElement);
   renderer.domElement.addEventListener('webglcontextlost', (event) => {
     event.preventDefault();
@@ -572,6 +590,16 @@
   let last = performance.now(), frames = 0, fpsT = 0;
   const _eyeP = V();
   const TEST = params.get('test') === '1';
+  // Escala dinâmica: se o FPS cair, alivia grama/sombra por alguns segundos
+  let perfScale = 1, perfCool = 0;
+  const baseGrassR = (HZ.sharedUniforms && HZ.sharedUniforms.uFadeGrass) ? HZ.sharedUniforms.uFadeGrass.value.clone() : null;
+  function applyPerfScale(s) {
+    if (!HZ.sharedUniforms || !HZ.sharedUniforms.uFadeGrass || !baseGrassR) return;
+    const f = 0.55 + 0.45 * s;
+    HZ.sharedUniforms.uFadeGrass.value.set(baseGrassR.x * f, baseGrassR.y * f);
+    // desliga sombra só em stutter grave; reativa depois
+    renderer.shadowMap.enabled = s > 0.4;
+  }
   function frame(now) {
     if (!TEST) requestAnimationFrame(frame);
     let dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -631,7 +659,16 @@
     if (!S.noRender) post.render(scene, camera, showGun ? rifle.scene : null);
     if (S.mode !== 'loading') updateHUD(dt);
     frames++; fpsT += (now - (frame.prev || now)) / 1000; frame.prev = now;
-    if (fpsT > 1) { HZ.fps = frames / fpsT; frames = 0; fpsT = 0; }
+    if (fpsT > 1) {
+      HZ.fps = frames / fpsT; frames = 0; fpsT = 0;
+      // adaptação automática só em qualidade alta/média (evita hitch e manchas por overload)
+      if (quality !== 'baixa' && S.mode === 'playing') {
+        if (HZ.fps < 28) { perfScale = Math.max(0.35, perfScale - 0.2); perfCool = 4; applyPerfScale(perfScale); }
+        else if (HZ.fps < 40) { perfScale = Math.max(0.55, perfScale - 0.1); perfCool = 2.5; applyPerfScale(perfScale); }
+        else if (perfCool > 0) { perfCool -= 1; }
+        else if (perfScale < 1 && HZ.fps > 50) { perfScale = Math.min(1, perfScale + 0.1); applyPerfScale(perfScale); }
+      }
+    }
   }
 
   // pré-compila shaders para evitar travadas no primeiro disparo

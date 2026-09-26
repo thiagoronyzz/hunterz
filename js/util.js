@@ -70,10 +70,17 @@
     const t = new THREE.CanvasTexture(canvas);
     t.wrapS = t.wrapT = opt.clamp ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
     t.colorSpace = opt.linear ? THREE.NoColorSpace : THREE.SRGBColorSpace;
-    t.anisotropy = HZ.maxAniso || 4;
+    t.anisotropy = opt.aniso === false ? 1 : (HZ.maxAniso || 4);
     if (opt.repeat) t.repeat.set(opt.repeat[0], opt.repeat[1]);
-    t.generateMipmaps = true;
-    t.minFilter = THREE.LinearMipmapLinearFilter;
+    // Mapas de alfa sem mipmaps: mipmaps de alfa geram "manchas pretas" na folhagem
+    if (opt.noMip) {
+      t.generateMipmaps = false;
+      t.minFilter = THREE.LinearFilter;
+      t.magFilter = THREE.LinearFilter;
+    } else {
+      t.generateMipmaps = true;
+      t.minFilter = THREE.LinearMipmapLinearFilter;
+    }
     return t;
   };
 

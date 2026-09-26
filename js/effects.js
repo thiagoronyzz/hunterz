@@ -422,37 +422,57 @@
   class Post {
     constructor(renderer, q) {
       this.r = renderer; this.q = q;
-      const opt = { type: THREE.HalfFloatType, depthBuffer: true, samples: q.samples };
+      // samples só se a GPU tiver MSAA em FBO; 0 evita alocação enorme e artefatos pretos
+      const samples = Math.max(0, q.samples | 0);
+      const opt = { type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: false, samples };
       this.rt = new THREE.WebGLRenderTarget(4, 4, opt);
-      this.a = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, depthBuffer: false });
-      this.b = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, depthBuffer: false });
+      this.rt.texture.generateMipmaps = false;
+      this.rt.texture.minFilter = THREE.LinearFilter;
+      this.rt.texture.magFilter = THREE.LinearFilter;
+      // Bloom em UnsignedByte (mais barato) e resolução menor
+      const bloomType = THREE.UnsignedByteType;
+      this.a = new THREE.WebGLRenderTarget(4, 4, { type: bloomType, depthBuffer: false, stencilBuffer: false });
+      this.b = new THREE.WebGLRenderTarget(4, 4, { type: bloomType, depthBuffer: false, stencilBuffer: false });
+      this.a.texture.generateMipmaps = false; this.b.texture.generateMipmaps = false;
       this.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
       this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); this.quad.frustumCulled = false;
       this.qs = new THREE.Scene(); this.qs.add(this.quad);
-      this.bright = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uTh: { value: 1.1 } }, vertexShader: QUAD_VS, fragmentShader: BRIGHT_FS, depthTest: false, depthWrite: false });
+      this.bright = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uTh: { value: 1.15 } }, vertexShader: QUAD_VS, fragmentShader: BRIGHT_FS, depthTest: false, depthWrite: false });
       this.blur = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uDir: { value: new THREE.Vector2() } }, vertexShader: QUAD_VS, fragmentShader: BLUR_FS, depthTest: false, depthWrite: false });
-      this.final = new THREE.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, uBloom: { value: q.bloom ? 0.32 : 0 }, uExposure: { value: 0.62 }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2() }, uDamage: { value: 0 }, uLow: { value: 0 }, uSat: { value: 1.08 }, uDead: { value: 0 }, uWet: { value: 0 } }, vertexShader: QUAD_VS, fragmentShader: FINAL_FS, depthTest: false, depthWrite: false });
+      this.final = new THREE.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, uBloom: { value: q.bloom ? 0.28 : 0 }, uExposure: { value: 0.62 }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2() }, uDamage: { value: 0 }, uLow: { value: 0 }, uSat: { value: 1.08 }, uDead: { value: 0 }, uWet: { value: 0 } }, vertexShader: QUAD_VS, fragmentShader: FINAL_FS, depthTest: false, depthWrite: false });
       this.u = this.final.uniforms;
+      this._black = new THREE.Texture();
+      // textura 1x1 preta para quando bloom está off (evita sample de RT vazio = manchas)
+      const c = document.createElement('canvas'); c.width = c.height = 1;
+      const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 1, 1);
+      this._black = new THREE.CanvasTexture(c);
+      this._black.needsUpdate = true;
     }
     setSize(w, h) {
-      this.rt.setSize(w, h);
-      const bw = Math.max(1, (w / 4) | 0), bh = Math.max(1, (h / 4) | 0);
+      const W = Math.max(1, w | 0), H = Math.max(1, h | 0);
+      this.rt.setSize(W, H);
+      // bloom a 1/6: menos custo e menos "glow" que vira mancha em telas escuras
+      const bw = Math.max(1, (W / 6) | 0), bh = Math.max(1, (H / 6) | 0);
       this.a.setSize(bw, bh); this.b.setSize(bw, bh);
-      this.u.uRes.value.set(w, h); this.bw = bw; this.bh = bh;
+      this.u.uRes.value.set(W, H); this.bw = bw; this.bh = bh;
     }
     pass(mat, target) { this.quad.material = mat; this.r.setRenderTarget(target); this.r.render(this.qs, this.cam); }
     render(scene, camera, overlayScene) {
       const r = this.r;
-      r.setRenderTarget(this.rt); r.clear(); r.render(scene, camera);
+      r.setRenderTarget(this.rt);
+      r.clear(true, true, true);
+      r.render(scene, camera);
       if (overlayScene) { r.autoClear = false; r.clearDepth(); r.render(overlayScene, camera); r.autoClear = true; }
       if (this.q.bloom) {
         this.bright.uniforms.tDiffuse.value = this.rt.texture; this.pass(this.bright, this.a);
-        for (let i = 0; i < 2; i++) {
-          this.blur.uniforms.tDiffuse.value = this.a.texture; this.blur.uniforms.uDir.value.set((1 + i) / this.bw, 0); this.pass(this.blur, this.b);
-          this.blur.uniforms.tDiffuse.value = this.b.texture; this.blur.uniforms.uDir.value.set(0, (1 + i) / this.bh); this.pass(this.blur, this.a);
-        }
+        // 1 par de blur (antes eram 2): metade do custo, visual quase igual
+        this.blur.uniforms.tDiffuse.value = this.a.texture; this.blur.uniforms.uDir.value.set(1.2 / this.bw, 0); this.pass(this.blur, this.b);
+        this.blur.uniforms.tDiffuse.value = this.b.texture; this.blur.uniforms.uDir.value.set(0, 1.2 / this.bh); this.pass(this.blur, this.a);
+        this.u.tBloom.value = this.a.texture;
+      } else {
+        this.u.tBloom.value = this._black;
       }
-      this.u.tScene.value = this.rt.texture; this.u.tBloom.value = this.a.texture;
+      this.u.tScene.value = this.rt.texture;
       this.pass(this.final, null);
     }
   }
