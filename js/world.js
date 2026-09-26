@@ -10,9 +10,11 @@
   const POND = { x: -76, z: 62 };
   const SPAWN = { x: 0, z: 18 };
 
+  // Alta prioriza nitidez estável: sombra 2K (4K engasga a maioria das GPUs),
+  // MSAA 2x e densidade de vegetação um pouco menor para evitar stutter e manchas.
   HZ.QUALITY = {
-    alta: { terrainSeg: 280, radial: 9, branchRadial: 5, leafCards: 56, treeNear: 120, far: 560, grassD: 3.0, grassR: 50, fern: 10000, fernR: 70, bush: 1800, sapling: 1200, flowers: 6000, twigs: 4000, stones: 4000, mushrooms: 1400, shadow: 4096, shadowR: 65, pixelRatio: 1.5, samples: 4, bloom: true, variants: 3, treeStep: 5.0 },
-    media: { terrainSeg: 210, radial: 8, branchRadial: 4, leafCards: 46, treeNear: 95, far: 480, grassD: 2.0, grassR: 38, fern: 6000, fernR: 55, bush: 1200, sapling: 800, flowers: 3500, twigs: 2200, stones: 2200, mushrooms: 800, shadow: 2048, shadowR: 55, pixelRatio: 1.25, samples: 4, bloom: true, variants: 2, treeStep: 5.4 },
+    alta: { terrainSeg: 240, radial: 8, branchRadial: 5, leafCards: 48, treeNear: 105, far: 520, grassD: 2.4, grassR: 44, fern: 7200, fernR: 60, bush: 1400, sapling: 900, flowers: 4500, twigs: 2800, stones: 2800, mushrooms: 1000, shadow: 2048, shadowR: 58, pixelRatio: 1.35, samples: 2, bloom: true, variants: 3, treeStep: 5.3 },
+    media: { terrainSeg: 210, radial: 8, branchRadial: 4, leafCards: 46, treeNear: 95, far: 480, grassD: 2.0, grassR: 38, fern: 6000, fernR: 55, bush: 1200, sapling: 800, flowers: 3500, twigs: 2200, stones: 2200, mushrooms: 800, shadow: 2048, shadowR: 55, pixelRatio: 1.25, samples: 2, bloom: true, variants: 2, treeStep: 5.4 },
     baixa: { terrainSeg: 140, radial: 6, branchRadial: 4, leafCards: 36, treeNear: 70, far: 380, grassD: 1.2, grassR: 26, fern: 3000, fernR: 40, bush: 700, sapling: 400, flowers: 1500, twigs: 900, stones: 900, mushrooms: 400, shadow: 1024, shadowR: 42, pixelRatio: 1, samples: 0, bloom: false, variants: 2, treeStep: 6.2 },
   };
 
@@ -148,9 +150,23 @@
       const dst = this.mesh.instanceMatrix.array, dc = this.c ? this.mesh.instanceColor.array : null;
       let k = 0;
       const cap = this.capVis;
-      for (const cell of this.cellList) {
+      // ordena células por distância: com maxVisible, árvores perto não somem (buracos pretos)
+      if (!this._order || this._order.length !== this.cellList.length) {
+        this._order = this.cellList.map((c, i) => i);
+        this._od = new Float32Array(this.cellList.length);
+      }
+      const order = this._order, od = this._od, cells = this.cellList;
+      for (let i = 0; i < cells.length; i++) {
+        const c = cells[i];
+        const dx = c.cx * this.cell + half - px, dz = c.cz * this.cell + half - pz;
+        od[i] = dx * dx + dz * dz; order[i] = i;
+      }
+      order.sort((a, b) => od[a] - od[b]);
+      for (let oi = 0; oi < order.length; oi++) {
+        if (k >= cap) break;
+        const cell = cells[order[oi]];
         const ccx = cell.cx * this.cell + half, ccz = cell.cz * this.cell + half;
-        const dx = ccx - px, dz = ccz - pz, d = Math.hypot(dx, dz);
+        const dx = ccx - px, dz = ccz - pz, d = Math.sqrt(od[order[oi]]);
         if (d - diag > R || (Rmin && d + diag < Rmin)) continue;
         _sph.center.set(ccx, cell.y + (this.o.objHeight || 1) * 0.5, ccz); _sph.radius = margin + (this.o.objHeight || 1) * 0.5;
         if (d > diag * 1.5 && !_fr.intersectsSphere(_sph)) continue;
@@ -260,8 +276,11 @@
   HZ.sharedUniforms = shared;
 
   function foliageMaterial(map, alphaMap, o = {}) {
-    const m = new THREE.MeshStandardMaterial({ map, alphaMap, alphaTest: o.alphaTest || 0.42, side: THREE.DoubleSide, vertexColors: true, roughness: o.roughness || 0.82, metalness: 0, color: o.color || 0xffffff, envMapIntensity: o.env || 0.55 });
-    if (HZ.q.samples > 0) m.alphaToCoverage = true;
+    // alphaTest um pouco mais alto evita "manchas" por mipmaps de alfa em distância média
+    const alphaCut = o.alphaTest || 0.48;
+    const m = new THREE.MeshStandardMaterial({ map, alphaMap, alphaTest: alphaCut, side: THREE.DoubleSide, vertexColors: true, roughness: o.roughness || 0.82, metalness: 0, color: o.color || 0xffffff, envMapIntensity: o.env || 0.55 });
+    // alphaToCoverage só com MSAA real; sem samples vira buracos pretos
+    if (HZ.q && HZ.q.samples > 0) m.alphaToCoverage = true;
     m.onBeforeCompile = shader => {
       shader.uniforms.uTime = HZ.windUniforms.uTime; shader.uniforms.uWind = HZ.windUniforms.uWind;
       shader.uniforms.uFade = o.fade || { value: new THREE.Vector2(1e5, 2e5) };
@@ -282,7 +301,7 @@
           float bl = pow(max(dot(normalize(-vViewPosition), uSunView), 0.0), 4.0);
           reflectedLight.directDiffuse += diffuseColor.rgb * uSunColor * (bl * uTrans + 0.06 * uTrans);`);
     };
-    m.customProgramCacheKey = () => 'foliage' + (o.fade ? 'F' : '') + (o.key || '');
+    m.customProgramCacheKey = () => 'foliage' + (o.fade ? 'F' : '') + (o.key || '') + 'a' + alphaCut;
     return m;
   }
   function woodMaterial(map, normalMap, o = {}) {
@@ -291,15 +310,22 @@
     return m;
   }
   function depthMaterial(alphaMap, fade) {
-    const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, alphaMap, alphaTest: 0.42, side: THREE.DoubleSide });
+    // Mesmo corte de alfa + fade da folhagem: evita silhuetas pretas no mapa de sombra
+    const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, alphaMap, alphaTest: 0.48, side: THREE.DoubleSide });
     d.onBeforeCompile = shader => {
       shader.uniforms.uTime = HZ.windUniforms.uTime; shader.uniforms.uWind = HZ.windUniforms.uWind;
       shader.uniforms.uFade = fade || { value: new THREE.Vector2(1e5, 2e5) };
+      const fadeCode = fade ? `
+          #ifdef USE_INSTANCING
+            vec3 fwp = (modelMatrix * vec4(ipos, 1.0)).xyz;
+            float fk = 1.0 - smoothstep(uFade.x, uFade.y, distance(fwp.xz, cameraPosition.xz));
+            transformed *= fk;
+          #endif` : '';
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\n' + HZ.WIND_PARS + '\nuniform vec2 uFade;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + HZ.WIND_VERTEX);
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + HZ.WIND_VERTEX + fadeCode);
     };
-    d.customProgramCacheKey = () => 'depthwind';
+    d.customProgramCacheKey = () => 'depthwind' + (fade ? 'F' : '');
     return d;
   }
   HZ.foliageMaterial = foliageMaterial;
@@ -377,8 +403,10 @@
     sun.castShadow = true;
     sun.shadow.mapSize.set(q.shadow, q.shadow);
     const sr = q.shadowR;
-    Object.assign(sun.shadow.camera, { left: -sr, right: sr, top: sr, bottom: -sr, near: 1, far: 320 });
-    sun.shadow.bias = -0.00035; sun.shadow.normalBias = 0.035;
+    // far menor = sombra mais nítida e barata; bias evita acne/manchas pretas no solo e folhas
+    Object.assign(sun.shadow.camera, { left: -sr, right: sr, top: sr, bottom: -sr, near: 2, far: 260 });
+    sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.045;
+    sun.shadow.radius = q.shadow >= 2048 ? 1.5 : 2.0;
     scene.add(sun); scene.add(sun.target); world.sun = sun;
     shared.uSunColor.value.copy(sun.color).multiplyScalar(0.9);
 
@@ -592,15 +620,17 @@
     world.archetypes = archetypes;
 
     // impostores: renderiza cada arquétipo lateralmente numa textura
+    // Sem mipmaps + clear transparente evita bordas pretas (bleed de RGB escuro no alfa).
     await prog(0.55, 'Pintando as camadas distantes');
     const impScene = new THREE.Scene();
     impScene.environment = scene.environment;
     impScene.add(new THREE.HemisphereLight(hemi.color, hemi.groundColor, 0.7));
     const impSun = new THREE.DirectionalLight(sun.color, 2.4); impSun.position.set(-3, 6, 8); impScene.add(impSun);
     const impCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
-    const IW = quality === 'baixa' ? 128 : 256;
+    const IW = quality === 'baixa' ? 128 : quality === 'media' ? 192 : 256;
     const prevTarget = renderer.getRenderTarget();
     const prevClear = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
+    const prevAutoClear = renderer.autoClear;
     for (const sp of Object.keys(archetypes)) for (const a of archetypes[sp]) {
       const tmp = [];
       const wm = new THREE.Mesh(a.wood, barkMats[sp]); tmp.push(wm);
@@ -611,14 +641,30 @@
       Object.assign(impCam, { left: -w / 2, right: w / 2, top: bb.max.y + 0.1, bottom: bb.min.y });
       impCam.position.set(0, 0, 60); impCam.lookAt(0, 0, 0); impCam.updateProjectionMatrix();
       tmp.forEach(m => impScene.add(m));
-      const rt = new THREE.WebGLRenderTarget(IW, IW * 2, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
-      renderer.setRenderTarget(rt); renderer.setClearColor(new THREE.Color().setRGB(0.08, 0.1, 0.06), 0); renderer.clear();
+      const rt = new THREE.WebGLRenderTarget(IW, IW * 2, {
+        generateMipmaps: false,
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        depthBuffer: true,
+        stencilBuffer: false,
+      });
+      renderer.setRenderTarget(rt);
+      // clear verde-floresta com alfa 0: no filtro bilinear a borda não vira preta
+      renderer.setClearColor(new THREE.Color().setRGB(0.18, 0.28, 0.12), 0);
+      renderer.autoClear = true;
+      renderer.clear();
       HZ.windUniforms.uWind.value = 0;
       renderer.render(impScene, impCam);
       HZ.windUniforms.uWind.value = 1;
       tmp.forEach(m => impScene.remove(m));
-      a.impTex = rt.texture; a.impW = w; a.impBottom = bb.min.y; a.impTop = bb.max.y + 0.1;
+      a.impTex = rt.texture;
+      a.impTex.generateMipmaps = false;
+      a.impTex.minFilter = THREE.LinearFilter;
+      a.impTex.magFilter = THREE.LinearFilter;
+      a.impTex.premultiplyAlpha = false;
+      a.impW = w; a.impBottom = bb.min.y; a.impTop = bb.max.y + 0.1;
     }
+    renderer.autoClear = prevAutoClear;
     renderer.setRenderTarget(prevTarget); renderer.setClearColor(prevClear, prevAlpha);
 
     // scatters de árvores (perto: geometria completa; longe: impostores)
@@ -627,8 +673,8 @@
     for (const sp of Object.keys(archetypes)) {
       tScat[sp] = archetypes[sp].map(a => {
         const near = {
-          wood: new Scatter(a.wood, barkMats[sp], { cell: 24, radius: q.treeNear, castShadow: true, objRadius: a.crown, objHeight: a.height, margin: 26, depthMat: woodDepth }),
-          leaves: a.leaves ? new Scatter(a.leaves, leafMats[sp], { cell: 24, radius: q.treeNear, castShadow: true, objRadius: a.crown, objHeight: a.height, margin: 26, depthMat: depthMats[sp], colors: true }) : null,
+          wood: new Scatter(a.wood, barkMats[sp], { cell: 24, radius: q.treeNear, castShadow: true, objRadius: a.crown, objHeight: a.height, margin: 26, depthMat: woodDepth, maxVisible: 700 }),
+          leaves: a.leaves ? new Scatter(a.leaves, leafMats[sp], { cell: 24, radius: q.treeNear, castShadow: true, objRadius: a.crown, objHeight: a.height, margin: 26, depthMat: depthMats[sp], colors: true, maxVisible: 700 }) : null,
         };
         // impostor: 3 planos cruzados
         const ig = new THREE.BufferGeometry(); const ipos = [], iuv = [], inor = [], iidx = [];
@@ -641,9 +687,17 @@
           iidx.push(b, b + 1, b + 2, b, b + 2, b + 3);
         }
         ig.setAttribute('position', new THREE.Float32BufferAttribute(ipos, 3)); ig.setAttribute('uv', new THREE.Float32BufferAttribute(iuv, 2)); ig.setAttribute('normal', new THREE.Float32BufferAttribute(inor, 3)); ig.setIndex(iidx);
-        const im = new THREE.MeshBasicMaterial({ map: a.impTex, alphaTest: 0.5, side: THREE.DoubleSide, color: new THREE.Color().setRGB(0.82, 0.86, 0.82) });
-        if (q.samples > 0) im.alphaToCoverage = true;
-        const far = new Scatter(ig, im, { cell: 48, radius: q.far, minRadius: q.treeNear - 4, objRadius: a.crown, objHeight: a.height, margin: 10, receiveShadow: false });
+        // alphaTest médio + cor neutra: corta o fundo sem franja preta nas árvores distantes
+        const im = new THREE.MeshBasicMaterial({
+          map: a.impTex,
+          alphaTest: 0.42,
+          side: THREE.DoubleSide,
+          color: new THREE.Color().setRGB(0.92, 0.95, 0.9),
+          depthWrite: true,
+          transparent: false,
+          fog: true,
+        });
+        const far = new Scatter(ig, im, { cell: 48, radius: q.far, minRadius: q.treeNear - 4, objRadius: a.crown, objHeight: a.height, margin: 10, receiveShadow: false, maxVisible: 900 });
         return { near, far, a };
       });
     }
@@ -812,7 +866,7 @@
 
     // grama densa gerada ao redor do jogador
     {
-      const gm = foliageMaterial(tx.grass, tx.grassA, { fade: fadeGrass, color: 0xd8e0c0, trans: 0.4, alphaTest: 0.38, key: 'grass', env: 0.6 });
+      const gm = foliageMaterial(tx.grass, tx.grassA, { fade: fadeGrass, color: 0xd8e0c0, trans: 0.4, alphaTest: 0.45, key: 'grass', env: 0.6 });
       const geos = [HZ.veg.grassClump(rU, 0.8, 0.5), HZ.veg.grassClump(rU, 0.7, 0.75), HZ.veg.grassClump(rU, 1.0, 0.42)];
       const maxVis = Math.round(Math.PI * q.grassR * q.grassR * q.grassD * 0.55);
       const grass = new DynamicScatter(geos, gm, {
@@ -845,9 +899,11 @@
     }
     // samambaias
     {
-      const fm = foliageMaterial(tx.fern, tx.fernA, { color: 0xc8dcb0, trans: 0.45, key: 'fern', env: 0.55, fade: { value: new THREE.Vector2(q.fernR * 0.75, q.fernR) } });
+      const fernFade = { value: new THREE.Vector2(q.fernR * 0.7, q.fernR) };
+      const fm = foliageMaterial(tx.fern, tx.fernA, { color: 0xc8dcb0, trans: 0.45, key: 'fern', env: 0.55, fade: fernFade, alphaTest: 0.48 });
       const geos = [HZ.veg.fern(rU), HZ.veg.fern(rU)];
-      const scats = geos.map(g => new Scatter(g, fm, { cell: 16, radius: q.fernR, objRadius: 1.5, objHeight: 1, colors: true, castShadow: quality === 'alta', depthMat: quality === 'alta' ? depthMaterial(tx.fernA) : undefined }));
+      // Samambaias não projetam sombra: barato e evita manchas pretas no mapa de sombra
+      const scats = geos.map(g => new Scatter(g, fm, { cell: 16, radius: q.fernR, objRadius: 1.5, objHeight: 1, colors: true, castShadow: false, maxVisible: 1800 }));
       let n = 0, tries = 0;
       while (n < q.fern && tries < q.fern * 8) {
         tries++;
@@ -863,12 +919,13 @@
     }
     // arbustos + mudas de abeto
     {
-      const bm = foliageMaterial(tx.bushLeaves, tx.bushLeavesA, { color: 0xd8e4c8, trans: 0.45, key: 'bush' });
+      const bm = foliageMaterial(tx.bushLeaves, tx.bushLeavesA, { color: 0xd8e4c8, trans: 0.45, key: 'bush', alphaTest: 0.48 });
       const bwood = woodMaterial(tx.barkOak, tx.barkOakN, { key: 'bw' });
       const bushes = [HZ.veg.bush(rU), HZ.veg.bush(rU), HZ.veg.bush(rU)];
-      const bs = bushes.map(b => ({ l: new Scatter(b.leaves, bm, { cell: 24, radius: q.treeNear * 0.9, castShadow: true, depthMat: depthMaterial(tx.bushLeavesA), objRadius: 2, objHeight: 1.5, colors: true, margin: 6 }), w: new Scatter(b.wood, bwood, { cell: 24, radius: 35, objRadius: 2, objHeight: 1.5 }) }));
+      // Só o tronco do arbusto projeta sombra (folhas geravam manchas e custo alto)
+      const bs = bushes.map(b => ({ l: new Scatter(b.leaves, bm, { cell: 24, radius: q.treeNear * 0.85, castShadow: false, objRadius: 2, objHeight: 1.5, colors: true, margin: 6, maxVisible: 500 }), w: new Scatter(b.wood, bwood, { cell: 24, radius: 35, castShadow: true, objRadius: 2, objHeight: 1.5, maxVisible: 500 }) }));
       const saps = [HZ.veg.spruce(rU, q, 1.8), HZ.veg.spruce(rU, q, 2.8), HZ.veg.spruce(rU, q, 3.8)];
-      const ss = saps.map(a => ({ l: new Scatter(a.leaves, leafMats.spruce, { cell: 24, radius: q.treeNear * 0.9, castShadow: true, depthMat: depthMats.spruce, objRadius: 1.5, objHeight: 4, colors: true, margin: 8 }), w: new Scatter(a.wood, barkMats.spruce, { cell: 24, radius: 50, objRadius: 1, objHeight: 4 }) }));
+      const ss = saps.map(a => ({ l: new Scatter(a.leaves, leafMats.spruce, { cell: 24, radius: q.treeNear * 0.85, castShadow: true, depthMat: depthMats.spruce, objRadius: 1.5, objHeight: 4, colors: true, margin: 8, maxVisible: 400 }), w: new Scatter(a.wood, barkMats.spruce, { cell: 24, radius: 50, castShadow: true, objRadius: 1, objHeight: 4, maxVisible: 400 }) }));
       let n = 0, tries = 0;
       while (n < q.bush && tries < q.bush * 10) {
         tries++;
@@ -953,13 +1010,18 @@
       const tx0 = Math.round(cam.position.x / texel) * texel, tz0 = Math.round(cam.position.z / texel) * texel;
       const ty = heightAt(cam.position.x, cam.position.z);
       sun.target.position.set(tx0, ty, tz0);
-      sun.position.set(tx0 + sunDir.x * 150, ty + sunDir.y * 150, tz0 + sunDir.z * 150);
+      // distância da luz alinhada ao far da câmera de sombra
+      const sunDist = 120;
+      sun.position.set(tx0 + sunDir.x * sunDist, ty + sunDir.y * sunDist, tz0 + sunDir.z * sunDist);
+      sun.updateMatrixWorld();
+      if (sun.shadow && sun.shadow.camera) sun.shadow.camera.updateMatrixWorld();
       shared.uSunView.value.copy(sunDir).transformDirection(cam.matrixWorldInverse);
       if (world.water) { world.water.material.normalMap.offset.set(t * 0.012, t * 0.007); }
-      // atualização escalonada das camadas de instâncias
+      // atualização escalonada: 1/4 das camadas por frame (menos hitch em qualidade alta)
       const L = world.layers;
       world._frame = (world._frame || 0) + 1;
-      for (let i = 0; i < L.length; i++) if ((i + world._frame) % 3 === 0 || world._force) L[i].update(cam, world._force);
+      const stride = L.length > 40 ? 4 : 3;
+      for (let i = 0; i < L.length; i++) if ((i + world._frame) % stride === 0 || world._force) L[i].update(cam, world._force);
       world._force = false;
     };
     world.forceUpdate = () => { world._force = true; };

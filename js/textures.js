@@ -363,7 +363,8 @@
     lin.forEach(k => (out[k] = tex(T[k], { linear: true })));
     ['pine', 'spruce', 'leaves', 'birchLeaves', 'bushLeaves', 'grass', 'fern', 'flower', 'blood', 'leaf'].forEach(k => {
       out[k] = tex(T[k].color, { clamp: true });
-      out[k + 'A'] = tex(T[k].alpha, { clamp: true, linear: true });
+      // alfa sem mipmap + aniso 1: corta a franja preta nas folhas/grama à distância
+      out[k + 'A'] = tex(T[k].alpha, { clamp: true, linear: true, noMip: true, aniso: false });
     });
     out.soft = tex(T.soft, { clamp: true });
     out.smoke = tex(T.smoke, { clamp: true });
