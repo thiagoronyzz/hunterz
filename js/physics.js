@@ -1,5 +1,5 @@
-/* HUNTERZ — mundo de colisão: árvores (cilindros), rochas (mapas de altura reais da malha),
-   troncos caídos (cápsulas), tocos (cilindros baixos) e raycast balístico. */
+/* HUNTERZ — collision world: trees (cylinders), rocks (real height maps from the mesh),
+   fallen logs (capsules), stumps (short cylinders) and ballistic raycasting. */
 (function () {
   'use strict';
   const HZ = window.HZ;
@@ -34,7 +34,7 @@
       const cx = (ax + bx) / 2, cz = (az + bz) / 2;
       return this.add({ type: 'log', cx, cz, ax, ay, az, bx, by, bz, r, br: Math.hypot(bx - ax, bz - az) / 2 + r + 0.1 });
     }
-    // rocha: grade de alturas local (unidade), com rotação Y e escala
+    // rock: local height grid (unit), with Y rotation and scale
     addRock(x, y, z, rot, sxz, sy, hg) {
       return this.add({ type: 'rock', cx: x, cz: z, x, y, z, cos: Math.cos(rot), sin: Math.sin(rot), sxz, sy, hg, br: hg.ext * sxz * 1.02, top: y + hg.max * sy });
     }
@@ -49,10 +49,10 @@
       }
     }
 
-    // altura da superfície de uma rocha num ponto (world), ou -Infinity
+    // surface height of a rock at a point (world), or -Infinity
     rockHeight(o, x, z) {
       const dx = x - o.x, dz = z - o.z;
-      // rotação inversa (Y)
+      // inverse rotation (Y)
       const lx = (dx * o.cos - dz * o.sin) / o.sxz;
       const lz = (dx * o.sin + dz * o.cos) / o.sxz;
       const hg = o.hg, n = hg.n;
@@ -84,7 +84,7 @@
       return -Infinity;
     }
 
-    // topo máximo dos obstáculos "pisáveis" sob um círculo
+    // highest top of the "steppable" obstacles under a circle
     topAt(x, z, rad) {
       let m = -Infinity;
       this.query(x, z, rad + 0.5, o => { if (o.type !== 'tree') { const h = this.objTop(o, x, z, rad); if (h > m) m = h; } });
@@ -93,7 +93,7 @@
 
     groundAt(x, z, rad = 0) { return Math.max(this.heightAt(x, z), this.topAt(x, z, rad)); }
 
-    // empurra um círculo para fora dos troncos de árvore
+    // pushes a circle out of tree trunks
     resolveTrees(p, rad) {
       let hit = false;
       this.query(p.x, p.z, rad + 1, o => {
@@ -104,7 +104,7 @@
       return hit;
     }
 
-    // Movimento de personagem com deslizamento. p = {x,y,z} (pés). Retorna info.
+    // Character movement with sliding. p = {x,y,z} (feet). Returns info.
     moveCircle(p, dx, dz, rad, step, bounds) {
       const res = { blockedX: false, blockedZ: false, ground: 0 };
       const len = Math.hypot(dx, dz);
@@ -117,7 +117,7 @@
           if (bounds) { nx = HZ.clamp(nx, -bounds, bounds); nz = HZ.clamp(nz, -bounds, bounds); }
           tmp.x = nx; tmp.z = nz; this.resolveTrees(tmp, rad);
           const g = this.groundAt(tmp.x, tmp.z, rad);
-          // bloqueado se o obstáculo for mais alto que o degrau (e mais alto do que onde já estamos, para escapar)
+          // blocked if the obstacle is taller than the step (and taller than where we already are, to escape)
           if (g > p.y + step && g > curBlockedTop - 0.01) return false;
           p.x = tmp.x; p.z = tmp.z; return true;
         };
@@ -132,7 +132,7 @@
       return res;
     }
 
-    // teste rápido: caminho livre para animais (sem árvores/rochas altas)
+    // fast test: clear path for animals (no tall trees/rocks)
     isBlocked(x, z, rad, y, step) {
       let blocked = false;
       this.query(x, z, rad + 1, o => {
@@ -144,7 +144,7 @@
     }
 
     // ------------------------------------------------------------ Raycast
-    // Retorna {t, point, normal, kind, obj} ou null
+    // Returns {t, point, normal, kind, obj} or null
     raycast(origin, dir, maxDist, skipTerrain) {
       let best = null;
       const consider = (t, kind, obj, normal) => { if (t >= 0 && t < maxDist && (!best || t < best.t)) best = { t, kind, obj, normal }; };
@@ -163,7 +163,7 @@
       const dxz = Math.hypot(dir.x, dir.z);
       for (const o of cand) {
         if (o.type === 'tree' || o.type === 'cyl') {
-          // cilindro vertical
+          // vertical cylinder
           const fx = origin.x - o.x, fz = origin.z - o.z;
           const a = dir.x * dir.x + dir.z * dir.z; if (a < 1e-8) continue;
           const b = 2 * (fx * dir.x + fz * dir.z), c = fx * fx + fz * fz - o.r * o.r;
@@ -175,7 +175,7 @@
           const hx = origin.x + dir.x * t - o.x, hz = origin.z + dir.z * t - o.z, hl = Math.hypot(hx, hz) || 1;
           consider(t, o.type === 'tree' ? 'tree' : 'wood', o, new THREE.Vector3(hx / hl, 0, hz / hl));
         } else {
-          // esfera envolvente + marcha
+          // bounding sphere + stepping
           const cy = o.type === 'rock' ? (o.y + o.top) / 2 : (o.ay + o.by) / 2;
           const R = o.type === 'rock' ? Math.max(o.br, (o.top - o.y) / 2 + 0.5) : o.br;
           const ocx = origin.x - o.cx, ocy = origin.y - cy, ocz = origin.z - o.cz;
@@ -222,7 +222,7 @@
     }
   }
 
-  // Constrói grade de alturas de uma geometria (espaço local) via raycast descendente
+  // Builds a height grid from a geometry (local space) via downward raycasting
   Physics.heightGrid = function (geometry, n = 28) {
     geometry.computeBoundingBox();
     const bb = geometry.boundingBox;

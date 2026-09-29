@@ -1,12 +1,12 @@
-/* HUNTERZ — efeitos: partículas, decalques de sangue, marcas de impacto, cápsulas,
-   raios de sol volumétricos, poeira no ar, folhas caindo, pássaros, chuva e pós-processamento. */
+/* HUNTERZ — effects: particles, blood decals, impact marks, casings,
+   volumetric sun rays, airborne dust, falling leaves, birds, rain and post-processing. */
 (function () {
   'use strict';
   const HZ = window.HZ;
   const THREE = window.THREE;
   const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
-  // ================================================================ PARTÍCULAS
+  // ================================================================ PARTICLES
   const PVS = `
     attribute vec4 aColor; attribute float aSize; varying vec4 vColor; varying float vDepth; uniform float uScale;
     void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vDepth = -mv.z; gl_PointSize = aSize * uScale / max(0.1, -mv.z); gl_Position = projectionMatrix * mv; vColor = aColor; }`;
@@ -65,7 +65,7 @@
     }
   }
 
-  // ================================================================ EFEITOS
+  // ================================================================ EFFECTS
   class Effects {
     constructor(scene, camera, world) {
       this.scene = scene; this.camera = camera; this.world = world;
@@ -74,7 +74,7 @@
       this.smoke = new Particles(scene, tx.smoke, 220);
       this.parts.onLand = (x, z) => { if (Math.random() < 0.35) this.groundDecal(x, z, 0.08 + Math.random() * 0.14, 0, 0.9); };
 
-      // decalques de sangue no chão
+      // blood decals on the ground
       const bloodMat = new THREE.MeshStandardMaterial({ map: tx.blood, alphaMap: tx.bloodA, alphaTest: 0.45, roughness: 0.3, metalness: 0.0, color: new THREE.Color().setRGB(2.4, 1.0, 1.0), polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, envMapIntensity: 0.3 });
       this.bloodMat = bloodMat;
       const dg = new THREE.PlaneGeometry(1, 1); dg.rotateX(-Math.PI / 2);
@@ -86,17 +86,17 @@
       this.growing = [];
       this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._q2 = new THREE.Quaternion(); this._s = V(); this._p = V(); this._n = V();
 
-      // marcas de bala em árvores/rochas
+      // bullet marks on trees/rocks
       const hm = new THREE.MeshBasicMaterial({ map: tx.soft, color: 0x000000, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
       this.holes = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), hm, 120);
       this.holes.count = 0; this.holes.frustumCulled = false; this.holeI = 0;
       scene.add(this.holes);
 
-      // sangue no corpo dos animais
+      // blood on animal bodies
       this.bodyBloodGeo = new THREE.CircleGeometry(0.5, 14);
       this.bodyBloodMat = new THREE.MeshStandardMaterial({ map: tx.blood, alphaMap: tx.bloodA, alphaTest: 0.4, roughness: 0.45, color: new THREE.Color().setRGB(1.8, 0.8, 0.8), envMapIntensity: 0.15, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6, side: THREE.DoubleSide });
 
-      // cápsulas
+      // shell casings
       const brass = new THREE.MeshStandardMaterial({ color: 0xc9a55a, metalness: 0.9, roughness: 0.28 });
       const cg = new THREE.CylinderGeometry(0.006, 0.006, 0.05, 8); cg.rotateZ(Math.PI / 2);
       this.casings = [];
@@ -111,7 +111,7 @@
       this.flashLight = new THREE.PointLight(0xffc27a, 0, 14, 2); scene.add(this.flashLight);
     }
 
-    // ------------------------------------------------ sangue / impactos
+    // ------------------------------------------------ blood / impacts
     bloodSpray(p, dir, amount = 1) {
       for (let i = 0; i < 26 * amount; i++) {
         const v = V(dir.x + (Math.random() - 0.5) * 0.9, dir.y + Math.random() * 0.7, dir.z + (Math.random() - 0.5) * 0.9).normalize().multiplyScalar(1.5 + Math.random() * 4.5);
@@ -149,7 +149,7 @@
       this.flashLight.position.copy(p); this.flashLight.intensity = 40; this.flashT = 0.06;
     }
 
-    // decalque no chão; grow>0 faz a poça crescer até "size"
+    // ground decal; grow>0 makes the pool grow up to "size"
     groundDecal(x, z, size, grow = 0, dark = 1) {
       const i = this.decalI; this.decalI = (this.decalI + 1) % this.decalN;
       const y = HZ.heightAt(x, z) + 0.015;
@@ -167,7 +167,7 @@
       if (grow) this.growing.push({ i, x, y, z, q: this._q.clone(), s: s0, target: size, rate: grow });
     }
 
-    // mancha de sangue presa a uma parte do corpo (segue a animação)
+    // blood stain attached to a body part (follows the animation)
     bodyBlood(mesh, localPoint, localNormal, size) {
       const d = new THREE.Mesh(this.bodyBloodGeo, this.bodyBloodMat);
       d.position.copy(localPoint).addScaledVector(localNormal, 0.006);
@@ -186,7 +186,7 @@
       c.w.set(Math.random() * 20, Math.random() * 20, Math.random() * 20);
     }
 
-    // ------------------------------------------------ raios de sol
+    // ------------------------------------------------ sun rays
     buildShafts() {
       const g = new THREE.BufferGeometry(); const pos = [], uv = [], idx = [];
       for (let k = 0; k < 2; k++) {
@@ -227,7 +227,7 @@
       this.shafts.count = k; this.shafts.instanceMatrix.needsUpdate = true;
     }
 
-    // ------------------------------------------------ poeira / pólen
+    // ------------------------------------------------ dust / pollen
     buildDust() {
       const N = 420; this.dustN = N;
       const pos = new Float32Array(N * 3), col = new Float32Array(N * 4), size = new Float32Array(N);
@@ -251,7 +251,7 @@
       this.dust.geometry.attributes.position.needsUpdate = true;
     }
 
-    // ------------------------------------------------ folhas caindo
+    // ------------------------------------------------ falling leaves
     buildLeaves() {
       const N = 50; this.leafN = N;
       const m = new THREE.MeshStandardMaterial({ map: HZ.tx.leaf, alphaMap: HZ.tx.leafA, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.8 });
@@ -277,7 +277,7 @@
       this.leaves.instanceMatrix.needsUpdate = true;
     }
 
-    // ------------------------------------------------ pássaros
+    // ------------------------------------------------ birds
     buildBirds() {
       const wing = new THREE.BufferGeometry();
       wing.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.12, 0, 0, 0.12, 0.55, 0.02, 0], 3));
@@ -308,7 +308,7 @@
       }
     }
 
-    // ------------------------------------------------ chuva
+    // ------------------------------------------------ rain
     buildRain() {
       const N = 5000; this.rainN = N;
       this.rainPos = new Float32Array(N * 6);
@@ -336,18 +336,18 @@
       this.rain.geometry.attributes.position.needsUpdate = true;
     }
 
-    // ------------------------------------------------ atualização
+    // ------------------------------------------------ update
     update(dt, t, cam, env) {
       const fog = this.scene.fog;
       for (const u of [this.parts.uniforms, this.smoke.uniforms, this.dustU]) { u.uFogC.value.copy(fog.color); u.uFogD.value = fog.density; u.uScale.value = env.pointScale; }
       this.parts.update(dt); this.smoke.update(dt);
-      // poças crescendo
+      // growing puddles
       if (this.growing.length) {
         for (const g of this.growing) { g.s = Math.min(g.target, g.s + g.rate * dt * (1 - g.s / g.target * 0.7)); this._m.compose(this._p.set(g.x, g.y, g.z), g.q, this._s.set(g.s, 1, g.s)); this.decals.setMatrixAt(g.i, this._m); }
         this.growing = this.growing.filter(g => g.s < g.target - 0.005);
         this.decals.instanceMatrix.needsUpdate = true;
       }
-      // cápsulas com física simples
+      // casings with simple physics
       for (const c of this.casings) {
         if (!c.m.visible) continue;
         c.life -= dt; if (c.life <= 0) { c.m.visible = false; continue; }
@@ -377,7 +377,7 @@
   }
   HZ.Effects = Effects;
 
-  // ================================================================ PÓS-PROCESSAMENTO
+  // ================================================================ POST-PROCESSING
   const QUAD_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
   const BRIGHT_FS = `uniform sampler2D tDiffuse; uniform float uTh; varying vec2 vUv;
     void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(uTh, uTh * 2.2, l), 1.0); }`;
@@ -406,7 +406,7 @@
       col = aces(col);
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(vec3(l), col, uSat * (1.0 - uLow * 0.55) * (1.0 - uDead));
-      // leve curva de cor cinematográfica (sombras frias, altas luzes quentes)
+      // light cinematic color curve (cool shadows, warm highlights)
       col = mix(col, col * vec3(0.94, 1.0, 1.04), (1.0 - l) * 0.35);
       col = mix(col, col * vec3(1.05, 1.0, 0.93), l * 0.3);
       col = mix(col, col * col * (3.0 - 2.0 * col), 0.18);
@@ -422,14 +422,14 @@
   class Post {
     constructor(renderer, q) {
       this.r = renderer; this.q = q;
-      // samples só se a GPU tiver MSAA em FBO; 0 evita alocação enorme e artefatos pretos
+      // samples only if the GPU has MSAA on FBO; 0 avoids a huge allocation and black artifacts
       const samples = Math.max(0, q.samples | 0);
       const opt = { type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: false, samples };
       this.rt = new THREE.WebGLRenderTarget(4, 4, opt);
       this.rt.texture.generateMipmaps = false;
       this.rt.texture.minFilter = THREE.LinearFilter;
       this.rt.texture.magFilter = THREE.LinearFilter;
-      // Bloom em UnsignedByte (mais barato) e resolução menor
+      // Bloom in UnsignedByte (cheaper) at lower resolution
       const bloomType = THREE.UnsignedByteType;
       this.a = new THREE.WebGLRenderTarget(4, 4, { type: bloomType, depthBuffer: false, stencilBuffer: false });
       this.b = new THREE.WebGLRenderTarget(4, 4, { type: bloomType, depthBuffer: false, stencilBuffer: false });
@@ -442,7 +442,7 @@
       this.final = new THREE.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, uBloom: { value: q.bloom ? 0.28 : 0 }, uExposure: { value: 0.62 }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2() }, uDamage: { value: 0 }, uLow: { value: 0 }, uSat: { value: 1.08 }, uDead: { value: 0 }, uWet: { value: 0 } }, vertexShader: QUAD_VS, fragmentShader: FINAL_FS, depthTest: false, depthWrite: false });
       this.u = this.final.uniforms;
       this._black = new THREE.Texture();
-      // textura 1x1 preta para quando bloom está off (evita sample de RT vazio = manchas)
+      // 1x1 black texture for when bloom is off (avoids sampling an empty RT = splotches)
       const c = document.createElement('canvas'); c.width = c.height = 1;
       const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 1, 1);
       this._black = new THREE.CanvasTexture(c);
@@ -451,7 +451,7 @@
     setSize(w, h) {
       const W = Math.max(1, w | 0), H = Math.max(1, h | 0);
       this.rt.setSize(W, H);
-      // bloom a 1/6: menos custo e menos "glow" que vira mancha em telas escuras
+      // bloom at 1/6: less cost and less "glow" that turns into splotches on dark screens
       const bw = Math.max(1, (W / 6) | 0), bh = Math.max(1, (H / 6) | 0);
       this.a.setSize(bw, bh); this.b.setSize(bw, bh);
       this.u.uRes.value.set(W, H); this.bw = bw; this.bh = bh;
@@ -465,7 +465,7 @@
       if (overlayScene) { r.autoClear = false; r.clearDepth(); r.render(overlayScene, camera); r.autoClear = true; }
       if (this.q.bloom) {
         this.bright.uniforms.tDiffuse.value = this.rt.texture; this.pass(this.bright, this.a);
-        // 1 par de blur (antes eram 2): metade do custo, visual quase igual
+        // 1 blur pair (used to be 2): half the cost, nearly the same look
         this.blur.uniforms.tDiffuse.value = this.a.texture; this.blur.uniforms.uDir.value.set(1.2 / this.bw, 0); this.pass(this.blur, this.b);
         this.blur.uniforms.tDiffuse.value = this.b.texture; this.blur.uniforms.uDir.value.set(0, 1.2 / this.bh); this.pass(this.blur, this.a);
         this.u.tBloom.value = this.a.texture;

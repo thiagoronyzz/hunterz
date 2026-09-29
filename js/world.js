@@ -1,5 +1,5 @@
-/* HUNTERZ — construção do mundo: céu, luz, terreno, trilha, lago, floresta em camadas,
-   sub-bosque, rochas/troncos com colisão e sistema de instâncias com LOD. */
+/* HUNTERZ — world building: sky, light, terrain, trail, lake, layered forest,
+   undergrowth, rocks/logs with collision and an instancing system with LOD. */
 (function () {
   'use strict';
   const HZ = window.HZ;
@@ -10,15 +10,15 @@
   const POND = { x: -76, z: 62 };
   const SPAWN = { x: 0, z: 18 };
 
-  // Alta prioriza nitidez estável: sombra 2K (4K engasga a maioria das GPUs),
-  // MSAA 2x e densidade de vegetação um pouco menor para evitar stutter e manchas.
+  // High prioritizes stable sharpness: 2K shadows (4K chokes most GPUs),
+  // 2x MSAA and slightly lower vegetation density to avoid stutter and splotches.
   HZ.QUALITY = {
-    alta: { terrainSeg: 240, radial: 8, branchRadial: 5, leafCards: 48, treeNear: 105, far: 520, grassD: 2.4, grassR: 44, fern: 7200, fernR: 60, bush: 1400, sapling: 900, flowers: 4500, twigs: 2800, stones: 2800, mushrooms: 1000, shadow: 2048, shadowR: 58, pixelRatio: 1.35, samples: 2, bloom: true, variants: 3, treeStep: 5.3 },
-    media: { terrainSeg: 210, radial: 8, branchRadial: 4, leafCards: 46, treeNear: 95, far: 480, grassD: 2.0, grassR: 38, fern: 6000, fernR: 55, bush: 1200, sapling: 800, flowers: 3500, twigs: 2200, stones: 2200, mushrooms: 800, shadow: 2048, shadowR: 55, pixelRatio: 1.25, samples: 2, bloom: true, variants: 2, treeStep: 5.4 },
-    baixa: { terrainSeg: 140, radial: 6, branchRadial: 4, leafCards: 36, treeNear: 70, far: 380, grassD: 1.2, grassR: 26, fern: 3000, fernR: 40, bush: 700, sapling: 400, flowers: 1500, twigs: 900, stones: 900, mushrooms: 400, shadow: 1024, shadowR: 42, pixelRatio: 1, samples: 0, bloom: false, variants: 2, treeStep: 6.2 },
+    high: { terrainSeg: 240, radial: 8, branchRadial: 5, leafCards: 48, treeNear: 105, far: 520, grassD: 2.4, grassR: 44, fern: 7200, fernR: 60, bush: 1400, sapling: 900, flowers: 4500, twigs: 2800, stones: 2800, mushrooms: 1000, shadow: 2048, shadowR: 58, pixelRatio: 1.35, samples: 2, bloom: true, variants: 3, treeStep: 5.3 },
+    medium: { terrainSeg: 210, radial: 8, branchRadial: 4, leafCards: 46, treeNear: 95, far: 480, grassD: 2.0, grassR: 38, fern: 6000, fernR: 55, bush: 1200, sapling: 800, flowers: 3500, twigs: 2200, stones: 2200, mushrooms: 800, shadow: 2048, shadowR: 55, pixelRatio: 1.25, samples: 2, bloom: true, variants: 2, treeStep: 5.4 },
+    low: { terrainSeg: 140, radial: 6, branchRadial: 4, leafCards: 36, treeNear: 70, far: 380, grassD: 1.2, grassR: 26, fern: 3000, fernR: 40, bush: 700, sapling: 400, flowers: 1500, twigs: 900, stones: 900, mushrooms: 400, shadow: 1024, shadowR: 42, pixelRatio: 1, samples: 0, bloom: false, variants: 2, treeStep: 6.2 },
   };
 
-  // ================================================================= CAMPOS
+  // ================================================================= FIELDS
   const TRAILS = [
     [[0, 40], [2, 18], [6, -6], [9, -30], [4, -55], [-10, -82], [-32, -104], [-62, -114], [-96, -100], [-122, -66], [-118, -26], [-100, 12], [-86, 42], [-78, 50]],
     [[9, -30], [30, -38], [58, -32], [86, -16], [112, 12], [128, 48], [124, 90], [100, 122], [66, 136]],
@@ -41,23 +41,23 @@
     const r = Math.max(Math.abs(x), Math.abs(z));
     const rise = HZ.smooth(200, 520, r);
     h += rise * rise * (40 + HZ.fbm(x * 0.004, z * 0.004, 3, 10) * 35);
-    // bacia do lago
+    // lake basin
     const dp = Math.hypot(x - POND.x, z - POND.z);
     if (dp < 30) { const W = HZ.WATER_Y; h = Math.min(h, HZ.lerp(W - 1.6 + Math.max(0, dp - 2) * 0.17, h, HZ.smooth(18, 30, dp))); }
     return h;
   }
   HZ.WATER_Y = 0;
   {
-    // define o nível da água a partir do terreno natural no centro do lago
+    // sets the water level from the natural terrain at the center of the lake
     const h0 = HZ.fbm(POND.x * 0.0055, POND.z * 0.0055, 4, 7) * 10 + HZ.fbm(POND.x * 0.024, POND.z * 0.024, 3, 8) * 1.7;
     HZ.WATER_Y = h0 - 0.35;
   }
 
-  // água só existe na bacia do lago (disco de 19 m)
+  // water only exists in the lake basin (19 m disc)
   HZ.POND = POND;
   HZ.isWater = (x, z, margin = 0) => Math.hypot(x - POND.x, z - POND.z) < 19 && HZ.heightAt(x, z) < HZ.WATER_Y + margin;
 
-  // Grade de alturas com interpolação idêntica à triangulação da malha
+  // Height grid with interpolation identical to the mesh triangulation
   let HG = null, HN = 0, HS = 0;
   function buildHeightGrid(seg) {
     HN = seg + 1; HS = WORLD / seg;
@@ -76,7 +76,7 @@
   HZ.heightAt = heightAt;
   HZ.groundNormal = function (x, z, out = V()) { const e = 0.5; return out.set(heightAt(x - e, z) - heightAt(x + e, z), 2 * e, heightAt(x, z - e) - heightAt(x, z + e)).normalize(); };
 
-  // densidade de floresta (0 = clareira, 1 = mata fechada) e espécie
+  // forest density (0 = clearing, 1 = dense woods) and species
   let DG = null; const DN = 211, DS = 2;
   function forestRaw(x, z) {
     let d = HZ.smooth(-0.3, 0.3, HZ.fbm(x * 0.0105 + 50, z * 0.0105, 3, 301) + 0.12);
@@ -150,7 +150,7 @@
       const dst = this.mesh.instanceMatrix.array, dc = this.c ? this.mesh.instanceColor.array : null;
       let k = 0;
       const cap = this.capVis;
-      // ordena células por distância: com maxVisible, árvores perto não somem (buracos pretos)
+      // sorts cells by distance: with maxVisible, nearby trees do not vanish (black holes)
       if (!this._order || this._order.length !== this.cellList.length) {
         this._order = this.cellList.map((c, i) => i);
         this._od = new Float32Array(this.cellList.length);
@@ -188,7 +188,7 @@
   }
   HZ.Scatter = Scatter;
 
-  // Instâncias geradas sob demanda ao redor do jogador (grama densa / flores)
+  // Instances generated on demand around the player (dense grass / flowers)
   class DynamicScatter {
     constructor(geos, material, o) {
       this.geos = geos; this.material = material; this.o = o;
@@ -271,15 +271,15 @@
     }
   }
 
-  // ================================================================ MATERIAIS
+  // ================================================================ MATERIALS
   const shared = { uFadeGrass: { value: new THREE.Vector2(30, 50) }, uSunView: { value: V(0, 1, 0) }, uSunColor: { value: new THREE.Color(1, 0.9, 0.75) } };
   HZ.sharedUniforms = shared;
 
   function foliageMaterial(map, alphaMap, o = {}) {
-    // alphaTest um pouco mais alto evita "manchas" por mipmaps de alfa em distância média
+    // a slightly higher alphaTest avoids "splotches" from alpha mipmaps at medium distance
     const alphaCut = o.alphaTest || 0.48;
     const m = new THREE.MeshStandardMaterial({ map, alphaMap, alphaTest: alphaCut, side: THREE.DoubleSide, vertexColors: true, roughness: o.roughness || 0.82, metalness: 0, color: o.color || 0xffffff, envMapIntensity: o.env || 0.55 });
-    // alphaToCoverage só com MSAA real; sem samples vira buracos pretos
+    // alphaToCoverage only with real MSAA; without samples it turns into black holes
     if (HZ.q && HZ.q.samples > 0) m.alphaToCoverage = true;
     m.onBeforeCompile = shader => {
       shader.uniforms.uTime = HZ.windUniforms.uTime; shader.uniforms.uWind = HZ.windUniforms.uWind;
@@ -310,7 +310,7 @@
     return m;
   }
   function depthMaterial(alphaMap, fade) {
-    // Mesmo corte de alfa + fade da folhagem: evita silhuetas pretas no mapa de sombra
+    // Same alpha cut + foliage fade: avoids black silhouettes in the shadow map
     const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, alphaMap, alphaTest: 0.48, side: THREE.DoubleSide });
     d.onBeforeCompile = shader => {
       shader.uniforms.uTime = HZ.windUniforms.uTime; shader.uniforms.uWind = HZ.windUniforms.uWind;
@@ -330,7 +330,7 @@
   }
   HZ.foliageMaterial = foliageMaterial;
 
-  // ================================================================== CÉU
+  // ================================================================== SKY
   const SKY_VS = `varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }`;
   const SKY_FS = `
     uniform vec3 uSunDir; uniform float uRain; uniform float uTime; uniform vec3 uHorizon; uniform vec3 uZenith; uniform float uSunI; uniform float uFlash;
@@ -361,9 +361,9 @@
       gl_FragColor = vec4(col, 1.0);
     }`;
 
-  // ================================================================ CONSTRUÇÃO
+  // ================================================================ BUILD
   HZ.buildWorld = async function (renderer, scene, quality, onProgress) {
-    const q = (HZ.q = HZ.QUALITY[quality] || HZ.QUALITY.alta);
+    const q = (HZ.q = HZ.QUALITY[quality] || HZ.QUALITY.high);
     const tx = HZ.tx;
     const world = { scene, q, layers: [], trees: [], rocks: [], physics: null, BOUND, SPAWN, POND };
     const prog = (p, msg) => { if (onProgress) onProgress(p, msg); return new Promise(r => setTimeout(r, 16)); };
@@ -372,7 +372,7 @@
     buildForestGrid();
     const physics = (world.physics = new HZ.Physics(heightAt));
 
-    // ------------------------------------------------ céu, névoa, luz
+    // ------------------------------------------------ sky, fog, light
     const sunDir = V(-0.42, 0.56, -0.71).normalize();
     world.sunDir = sunDir;
     const skyU = { uSunDir: { value: sunDir }, uRain: { value: 0 }, uTime: { value: 0 }, uHorizon: { value: new THREE.Color().setRGB(0.62, 0.68, 0.66) }, uZenith: { value: new THREE.Color().setRGB(0.2, 0.36, 0.62) }, uSunI: { value: 1 }, uFlash: { value: 0 } };
@@ -381,12 +381,12 @@
     scene.add(sky); world.sky = sky; world.skyU = skyU;
     scene.fog = new THREE.FogExp2(new THREE.Color().setRGB(0.5, 0.56, 0.53), 0.0052);
 
-    // mapa de ambiente a partir do céu (iluminação indireta PBR)
+    // environment map from the sky (PBR indirect lighting)
     {
       const envScene = new THREE.Scene();
       const skyClone = new THREE.Mesh(sky.geometry, sky.material);
       envScene.add(skyClone);
-      // "chão" verde escuro para o hemisfério inferior do ambiente
+      // dark green "ground" for the lower hemisphere of the environment
       const gnd = new THREE.Mesh(new THREE.CircleGeometry(900, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(0.07, 0.085, 0.05), side: THREE.DoubleSide }));
       gnd.rotation.x = -Math.PI / 2; gnd.position.y = -20; envScene.add(gnd);
       skyU.uSunI.value = 0.25;
@@ -403,16 +403,16 @@
     sun.castShadow = true;
     sun.shadow.mapSize.set(q.shadow, q.shadow);
     const sr = q.shadowR;
-    // far menor = sombra mais nítida e barata; bias evita acne/manchas pretas no solo e folhas
+    // smaller far = sharper, cheaper shadows; bias avoids acne/black splotches on ground and leaves
     Object.assign(sun.shadow.camera, { left: -sr, right: sr, top: sr, bottom: -sr, near: 2, far: 260 });
     sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.045;
     sun.shadow.radius = q.shadow >= 2048 ? 1.5 : 2.0;
     scene.add(sun); scene.add(sun.target); world.sun = sun;
     shared.uSunColor.value.copy(sun.color).multiplyScalar(0.9);
 
-    await prog(0.12, 'Esculpindo o relevo');
+    await prog(0.12, 'Sculpting the terrain');
 
-    // ------------------------------------------------ terreno
+    // ------------------------------------------------ terrain
     const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, normalMap: tx.groundN, normalScale: new THREE.Vector2(1.1, 1.1), envMapIntensity: 0.45 });
     const wetU = { value: 0 };
     world.wetU = wetU;
@@ -442,8 +442,8 @@
     terrainMat.customProgramCacheKey = () => 'terrain';
     world.terrainMat = terrainMat;
 
-    // árvores são posicionadas antes do terreno para oclusão ambiental no solo
-    await prog(0.2, 'Plantando a floresta');
+    // trees are placed before the terrain for ambient occlusion on the ground
+    await prog(0.2, 'Planting the forest');
     const rT = HZ.rng(777);
     const treeList = [];
     const pickSpecies = (x, z) => {
@@ -464,7 +464,7 @@
         if (Math.hypot(x - POND.x, z - POND.z) < 17) continue;
         treeList.push({ x, z, sp: pickSpecies(x, z), s: 0.78 + rT() * 0.45, rot: rT() * Math.PI * 2, v: (rT() * q.variants) | 0, outer: false });
       }
-      // anel externo (apenas impostores) — camadas de floresta até o horizonte
+      // outer ring (impostors only) — forest layers out to the horizon
       const st2 = st * 1.35;
       for (let gz = -440; gz < 440; gz += st2) for (let gx = -440; gx < 440; gx += st2) {
         if (Math.abs(gx) < HALF - 4 && Math.abs(gz) < HALF - 4) continue;
@@ -476,8 +476,8 @@
       }
     }
 
-    // ------------------------------------------------ malha do terreno interno
-    await prog(0.3, 'Cobrindo o chão da floresta');
+    // ------------------------------------------------ inner terrain mesh
+    await prog(0.3, 'Covering the forest floor');
     {
       const seg = q.terrainSeg, n = seg + 1;
       const pos = new Float32Array(n * n * 3), uv = new Float32Array(n * n * 2), splat = new Float32Array(n * n * 4), col = new Float32Array(n * n * 3);
@@ -500,7 +500,7 @@
         const ao = 1 - D * 0.28;
         col[k * 3] = ao; col[k * 3 + 1] = ao; col[k * 3 + 2] = ao;
       }
-      // oclusão na base das árvores
+      // occlusion at the base of the trees
       for (const t of treeList) {
         if (t.outer) continue;
         const R = 3.2 * t.s, i0 = Math.max(0, Math.floor((t.x - R + HALF) / HS)), i1 = Math.min(seg, Math.ceil((t.x + R + HALF) / HS));
@@ -527,7 +527,7 @@
       terrain.receiveShadow = true;
       scene.add(terrain); world.terrain = terrain;
     }
-    // terreno externo (colinas até o horizonte)
+    // outer terrain (hills out to the horizon)
     {
       const size = 1800, seg = 150;
       const g = new THREE.PlaneGeometry(size, size, seg, seg); g.rotateX(-Math.PI / 2);
@@ -550,7 +550,7 @@
       outer.receiveShadow = false;
       scene.add(outer);
     }
-    // cordilheira distante (silhuetas azuladas pela perspectiva atmosférica)
+    // distant mountain range (blueish silhouettes from atmospheric perspective)
     {
       const layers = [[900, 110, 0.55], [1250, 190, 0.42]];
       for (const [R, Hm, mix] of layers) {
@@ -576,7 +576,7 @@
       }
     }
 
-    // ------------------------------------------------ água do lago
+    // ------------------------------------------------ lake water
     {
       const wg = new THREE.CircleGeometry(19, 64); wg.rotateX(-Math.PI / 2);
       const waterN = tx.waterN; waterN.repeat.set(6, 6);
@@ -586,8 +586,8 @@
       scene.add(water); world.water = water;
     }
 
-    // ------------------------------------------------ materiais de árvores
-    await prog(0.42, 'Crescendo pinheiros, abetos e carvalhos');
+    // ------------------------------------------------ tree materials
+    await prog(0.42, 'Growing pines, firs and oaks');
     const fadeGrass = shared.uFadeGrass; fadeGrass.value.set(q.grassR * 0.7, q.grassR);
     const barkMats = {
       pine: woodMaterial(tx.barkPine, tx.barkPineN, { key: 'p' }),
@@ -619,15 +619,15 @@
     }
     world.archetypes = archetypes;
 
-    // impostores: renderiza cada arquétipo lateralmente numa textura
-    // Sem mipmaps + clear transparente evita bordas pretas (bleed de RGB escuro no alfa).
-    await prog(0.55, 'Pintando as camadas distantes');
+    // impostors: renders each archetype side by side into a texture
+    // No mipmaps + transparent clear avoids black edges (dark RGB bleeding into alpha).
+    await prog(0.55, 'Painting the distant layers');
     const impScene = new THREE.Scene();
     impScene.environment = scene.environment;
     impScene.add(new THREE.HemisphereLight(hemi.color, hemi.groundColor, 0.7));
     const impSun = new THREE.DirectionalLight(sun.color, 2.4); impSun.position.set(-3, 6, 8); impScene.add(impSun);
     const impCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
-    const IW = quality === 'baixa' ? 128 : quality === 'media' ? 192 : 256;
+    const IW = quality === 'low' ? 128 : quality === 'medium' ? 192 : 256;
     const prevTarget = renderer.getRenderTarget();
     const prevClear = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
     const prevAutoClear = renderer.autoClear;
@@ -649,7 +649,7 @@
         stencilBuffer: false,
       });
       renderer.setRenderTarget(rt);
-      // clear verde-floresta com alfa 0: no filtro bilinear a borda não vira preta
+      // forest-green clear with alpha 0: under bilinear filtering the edge does not turn black
       renderer.setClearColor(new THREE.Color().setRGB(0.18, 0.28, 0.12), 0);
       renderer.autoClear = true;
       renderer.clear();
@@ -667,7 +667,7 @@
     renderer.autoClear = prevAutoClear;
     renderer.setRenderTarget(prevTarget); renderer.setClearColor(prevClear, prevAlpha);
 
-    // scatters de árvores (perto: geometria completa; longe: impostores)
+    // tree scatters (near: full geometry; far: impostors)
     const mTmp = new THREE.Matrix4(), qTmp = new THREE.Quaternion(), sTmp = V(), pTmp = V(), eTmp = new THREE.Euler();
     const tScat = {};
     for (const sp of Object.keys(archetypes)) {
@@ -676,7 +676,7 @@
           wood: new Scatter(a.wood, barkMats[sp], { cell: 24, radius: q.treeNear, castShadow: true, objRadius: a.crown, objHeight: a.height, margin: 26, depthMat: woodDepth, maxVisible: 700 }),
           leaves: a.leaves ? new Scatter(a.leaves, leafMats[sp], { cell: 24, radius: q.treeNear, castShadow: true, objRadius: a.crown, objHeight: a.height, margin: 26, depthMat: depthMats[sp], colors: true, maxVisible: 700 }) : null,
         };
-        // impostor: 3 planos cruzados
+        // impostor: 3 crossed planes
         const ig = new THREE.BufferGeometry(); const ipos = [], iuv = [], inor = [], iidx = [];
         for (let k = 0; k < 3; k++) {
           const ang = (k * Math.PI) / 3, cx = Math.cos(ang), cz = Math.sin(ang), b = ipos.length / 3;
@@ -687,7 +687,7 @@
           iidx.push(b, b + 1, b + 2, b, b + 2, b + 3);
         }
         ig.setAttribute('position', new THREE.Float32BufferAttribute(ipos, 3)); ig.setAttribute('uv', new THREE.Float32BufferAttribute(iuv, 2)); ig.setAttribute('normal', new THREE.Float32BufferAttribute(inor, 3)); ig.setIndex(iidx);
-        // alphaTest médio + cor neutra: corta o fundo sem franja preta nas árvores distantes
+        // medium alphaTest + neutral color: cuts the background without a black fringe on distant trees
         const im = new THREE.MeshBasicMaterial({
           map: a.impTex,
           alphaTest: 0.42,
@@ -721,20 +721,20 @@
       s.near.wood.build(scene); s.far.build(scene); if (s.near.leaves) s.near.leaves.build(scene);
     }
 
-    // ------------------------------------------------ rochas (colisão real)
-    await prog(0.68, 'Posicionando rochas e troncos caídos');
+    // ------------------------------------------------ rocks (real collision)
+    await prog(0.68, 'Placing rocks and fallen logs');
     const rockMat = new THREE.MeshStandardMaterial({ map: tx.rock, normalMap: tx.rockN, normalScale: new THREE.Vector2(1.4, 1.4), vertexColors: true, roughness: 0.92, envMapIntensity: 0.5 });
     const rockArch = [];
     const rR = HZ.rng(9090);
     for (let a = 0; a < 6; a++) {
-      const g = new THREE.IcosahedronGeometry(1, quality === 'baixa' ? 3 : 4);
+      const g = new THREE.IcosahedronGeometry(1, quality === 'low' ? 3 : 4);
       const p = g.attributes.position, n = p.count, seed = a * 13 + 1;
       const flat = 0.5 + rR() * 0.35, cut = -0.25 - rR() * 0.2;
       for (let i = 0; i < n; i++) {
         const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
         const k = 1 + HZ.perlin(x * 1.1 + seed, y * 1.1 + z * 0.7, seed) * 0.32 + HZ.perlin(x * 3.2 + z, y * 3.2 - seed, seed + 1) * 0.1 + HZ.perlin(x * 8 + seed, z * 8 + y, seed + 2) * 0.03;
         let nx = x * k, ny = y * k * flat, nz = z * k;
-        // facetas planas (rocha fraturada)
+        // flat facets (fractured rock)
         const f1 = nx * 0.7 + ny * 0.3 + nz * 0.5; if (f1 > 0.75) { const d = f1 - 0.75; nx -= 0.7 * d; ny -= 0.3 * d; nz -= 0.5 * d; }
         if (ny < cut) ny = cut + (ny - cut) * 0.2;
         p.setXYZ(i, nx, ny, nz);
@@ -751,7 +751,7 @@
         col[i * 3] = r * s; col[i * 3 + 1] = gg * s; col[i * 3 + 2] = b * s;
       }
       g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-      g.translate(0, -cut - 0.12, 0); // base levemente enterrada
+      g.translate(0, -cut - 0.12, 0); // base slightly buried
       const hg = HZ.Physics.heightGrid(g, 30);
       rockArch.push({ g, hg, scat: new Scatter(g, rockMat, { cell: 32, radius: q.treeNear * 1.1, castShadow: true, objRadius: 4, objHeight: 3, margin: 12 }) });
     }
@@ -765,7 +765,7 @@
       if (clash) return false;
       const ra = rockArch[arch];
       const rot = rR() * Math.PI * 2, sy = s * (0.75 + rR() * 0.5);
-      // afunda de acordo com o declive
+      // sinks according to the slope
       const y = Math.min(heightAt(x - s * 0.6, z), heightAt(x + s * 0.6, z), heightAt(x, z - s * 0.6), heightAt(x, z + s * 0.6), heightAt(x, z)) - 0.05 * s;
       mTmp.compose(pTmp.set(x, y, z), qTmp.setFromEuler(eTmp.set(0, rot, 0)), sTmp.set(s, sy, s));
       ra.scat.add(mTmp);
@@ -775,7 +775,7 @@
     };
     {
       let placed = 0, tries = 0;
-      while (placed < 55 && tries < 2000) { // aglomerados de rochas
+      while (placed < 55 && tries < 2000) { // rock clusters
         tries++;
         const cx = (rR() - 0.5) * 2 * BOUND, cz = (rR() - 0.5) * 2 * BOUND;
         const n = 1 + ((rR() * 5) | 0);
@@ -784,14 +784,14 @@
           if (placeRock(cx + (rR() - 0.5) * 7, cz + (rR() - 0.5) * 7, s, (rR() * 6) | 0)) placed += i === 0 ? 1 : 0;
         }
       }
-      // rocha grande perto do início (para testar a colisão/escalada)
+      // large rock near the start (to test collision/climbing)
       placeRock(SPAWN.x + 7, SPAWN.z - 10, 1.6, 2);
       placeRock(SPAWN.x - 9, SPAWN.z - 6, 0.9, 4);
       for (let i = 0; i < 160; i++) placeRock((rR() - 0.5) * 2 * BOUND, (rR() - 0.5) * 2 * BOUND, 0.3 + rR() * 0.7, (rR() * 6) | 0);
     }
     rockArch.forEach(r => { r.scat.build(scene); world.layers.push(r.scat); });
 
-    // ------------------------------------------------ troncos caídos e tocos
+    // ------------------------------------------------ fallen logs and stumps
     {
       const logMat = new THREE.MeshStandardMaterial({ map: tx.barkPine, normalMap: tx.barkPineN, vertexColors: true, roughness: 0.95, envMapIntensity: 0.45 });
       const logs = [];
@@ -829,7 +829,7 @@
       logScat.forEach(s => { s.build(scene); world.layers.push(s); });
       world.logs = logs;
 
-      // tocos com anéis no topo
+      // stumps with rings on top
       const stumpG = new THREE.CylinderGeometry(0.34, 0.46, 0.7, 12, 1, false);
       stumpG.translate(0, 0.25, 0);
       const stumpMats = [new THREE.MeshStandardMaterial({ map: tx.barkOak, normalMap: tx.barkOakN, roughness: 0.95, envMapIntensity: 0.45 }), new THREE.MeshStandardMaterial({ map: tx.rings, roughness: 0.9 }), new THREE.MeshStandardMaterial({ map: tx.rings, roughness: 0.9 })];
@@ -849,8 +849,8 @@
       stumpScat.build(scene); world.layers.push(stumpScat);
     }
 
-    // ------------------------------------------------ sub-bosque em camadas
-    await prog(0.8, 'Espalhando samambaias, arbustos e grama');
+    // ------------------------------------------------ layered undergrowth
+    await prog(0.8, 'Spreading ferns, bushes and grass');
     const rU = HZ.rng(5151);
     const insideObstacle = (x, z, r = 0.3) => { let hit = false; physics.query(x, z, r + 0.5, o => { if (hit) return; if (o.type === 'tree') { if (Math.hypot(x - o.x, z - o.z) < o.r + r) hit = true; } else if (physics.objTop(o, x, z, r) > -Infinity) hit = true; }); return hit; };
     const inWater = (x, z) => heightAt(x, z) < HZ.WATER_Y + 0.05 && Math.hypot(x - POND.x, z - POND.z) < 20;
@@ -864,7 +864,7 @@
       scat.add(mTmp, color);
     };
 
-    // grama densa gerada ao redor do jogador
+    // dense grass generated around the player
     {
       const gm = foliageMaterial(tx.grass, tx.grassA, { fade: fadeGrass, color: 0xd8e0c0, trans: 0.4, alphaTest: 0.45, key: 'grass', env: 0.6 });
       const geos = [HZ.veg.grassClump(rU, 0.8, 0.5), HZ.veg.grassClump(rU, 0.7, 0.75), HZ.veg.grassClump(rU, 1.0, 0.42)];
@@ -884,7 +884,7 @@
         },
       });
       grass.build(scene); world.layers.push(grass);
-      // flores silvestres nas clareiras
+      // wildflowers in the clearings
       const flm = foliageMaterial(tx.flower, tx.flowerA, { fade: { value: new THREE.Vector2(20, 30) }, key: 'flower', trans: 0.3 });
       const tints = [[1, 1, 1], [1, 0.95, 0.5], [0.75, 0.6, 1], [1, 0.75, 0.85]];
       const flowers = new DynamicScatter([HZ.veg.flower(rU)], flm, {
@@ -897,12 +897,12 @@
       });
       flowers.build(scene); world.layers.push(flowers);
     }
-    // samambaias
+    // ferns
     {
       const fernFade = { value: new THREE.Vector2(q.fernR * 0.7, q.fernR) };
       const fm = foliageMaterial(tx.fern, tx.fernA, { color: 0xc8dcb0, trans: 0.45, key: 'fern', env: 0.55, fade: fernFade, alphaTest: 0.48 });
       const geos = [HZ.veg.fern(rU), HZ.veg.fern(rU)];
-      // Samambaias não projetam sombra: barato e evita manchas pretas no mapa de sombra
+      // Ferns do not cast shadows: cheap and avoids black splotches in the shadow map
       const scats = geos.map(g => new Scatter(g, fm, { cell: 16, radius: q.fernR, objRadius: 1.5, objHeight: 1, colors: true, castShadow: false, maxVisible: 1800 }));
       let n = 0, tries = 0;
       while (n < q.fern && tries < q.fern * 8) {
@@ -917,12 +917,12 @@
       }
       scats.forEach(s => { s.build(scene); world.layers.push(s); });
     }
-    // arbustos + mudas de abeto
+    // bushes + fir saplings
     {
       const bm = foliageMaterial(tx.bushLeaves, tx.bushLeavesA, { color: 0xd8e4c8, trans: 0.45, key: 'bush', alphaTest: 0.48 });
       const bwood = woodMaterial(tx.barkOak, tx.barkOakN, { key: 'bw' });
       const bushes = [HZ.veg.bush(rU), HZ.veg.bush(rU), HZ.veg.bush(rU)];
-      // Só o tronco do arbusto projeta sombra (folhas geravam manchas e custo alto)
+      // Only the bush trunk casts a shadow (leaves caused splotches and high cost)
       const bs = bushes.map(b => ({ l: new Scatter(b.leaves, bm, { cell: 24, radius: q.treeNear * 0.85, castShadow: false, objRadius: 2, objHeight: 1.5, colors: true, margin: 6, maxVisible: 500 }), w: new Scatter(b.wood, bwood, { cell: 24, radius: 35, castShadow: true, objRadius: 2, objHeight: 1.5, maxVisible: 500 }) }));
       const saps = [HZ.veg.spruce(rU, q, 1.8), HZ.veg.spruce(rU, q, 2.8), HZ.veg.spruce(rU, q, 3.8)];
       const ss = saps.map(a => ({ l: new Scatter(a.leaves, leafMats.spruce, { cell: 24, radius: q.treeNear * 0.85, castShadow: true, depthMat: depthMats.spruce, objRadius: 1.5, objHeight: 4, colors: true, margin: 8, maxVisible: 400 }), w: new Scatter(a.wood, barkMats.spruce, { cell: 24, radius: 50, castShadow: true, objRadius: 1, objHeight: 4, maxVisible: 400 }) }));
@@ -949,7 +949,7 @@
       }
       [...bs, ...ss].forEach(o => { o.l.build(scene); o.w.build(scene); world.layers.push(o.l, o.w); });
     }
-    // flores, cogumelos, gravetos, pedrinhas, juncos
+    // flowers, mushrooms, twigs, pebbles, reeds
     {
       const plainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, envMapIntensity: 0.5 });
       const mushA = new Scatter(HZ.veg.mushroom([0.62, 0.42, 0.24], [0.9, 0.86, 0.78], rU), plainMat, { cell: 12, radius: 28 });
@@ -992,32 +992,32 @@
         place(rs, x, z, 0.8 + rU() * 0.6, rU() * 6.28, 0.3);
       }
       rs.build(scene); world.layers.push(rs);
-      // vitórias-régias
+      // water lilies
       const padG = new THREE.CircleGeometry(0.35, 12, 0.3, Math.PI * 2 - 0.6); padG.rotateX(-Math.PI / 2);
       const pads = new THREE.InstancedMesh(padG, new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(0.12, 0.22, 0.06), roughness: 0.4, side: THREE.DoubleSide }), 40);
       for (let i = 0; i < 40; i++) { const a = rU() * 6.28, d = rU() * 9; mTmp.compose(pTmp.set(POND.x + Math.cos(a) * d, HZ.WATER_Y + 0.02, POND.z + Math.sin(a) * d), qTmp.setFromEuler(eTmp.set(0, rU() * 6, 0)), sTmp.setScalar(0.6 + rU() * 0.9)); pads.setMatrixAt(i, mTmp); }
       pads.receiveShadow = true; scene.add(pads);
     }
 
-    await prog(0.92, 'Ajustando a luz');
+    await prog(0.92, 'Adjusting the light');
     world.update = function (cam, dt, t) {
       HZ.windUniforms.uTime.value = t;
       world.sky.position.copy(cam.position);
       world.skyU.uTime.value = t;
       if (world.mountains) world.mountains.forEach(m => { m.position.x = cam.position.x; m.position.z = cam.position.z; });
-      // sombra acompanha o jogador, com "snap" para evitar cintilação
+      // the shadow follows the player, with a "snap" to avoid shimmering
       const texel = (2 * q.shadowR) / q.shadow;
       const tx0 = Math.round(cam.position.x / texel) * texel, tz0 = Math.round(cam.position.z / texel) * texel;
       const ty = heightAt(cam.position.x, cam.position.z);
       sun.target.position.set(tx0, ty, tz0);
-      // distância da luz alinhada ao far da câmera de sombra
+      // light distance aligned with the shadow camera far plane
       const sunDist = 120;
       sun.position.set(tx0 + sunDir.x * sunDist, ty + sunDir.y * sunDist, tz0 + sunDir.z * sunDist);
       sun.updateMatrixWorld();
       if (sun.shadow && sun.shadow.camera) sun.shadow.camera.updateMatrixWorld();
       shared.uSunView.value.copy(sunDir).transformDirection(cam.matrixWorldInverse);
       if (world.water) { world.water.material.normalMap.offset.set(t * 0.012, t * 0.007); }
-      // atualização escalonada: 1/4 das camadas por frame (menos hitch em qualidade alta)
+      // staggered update: 1/4 of the layers per frame (less hitching on high quality)
       const L = world.layers;
       world._frame = (world._frame || 0) + 1;
       const stride = L.length > 40 ? 4 : 3;

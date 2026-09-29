@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="description" content="Hunterz — caçada realista em primeira pessoa numa floresta viva, com predadores que caçam você." />
+  <meta name="description" content="Hunterz — realistic first-person hunt in a living forest, with predators that hunt you back." />
   <meta name="theme-color" content="#0b120e" />
-  <title>HUNTERZ — Caçada na floresta</title>
+  <title>HUNTERZ — Forest Hunt</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <main id="game" aria-label="Hunterz — jogo de caça em primeira pessoa">
+  <main id="game" aria-label="Hunterz — first-person hunting game">
     <div id="scene" aria-hidden="true"></div>
     <div class="vignette" aria-hidden="true"></div>
     <div id="bloodOverlay" aria-hidden="true"></div>
@@ -17,23 +17,23 @@
 
     <div id="scope" aria-hidden="true">
       <div class="mask"></div><div class="ring"></div><div class="h"></div><div class="v"></div><div class="dot"></div>
-      <div class="breath" id="breathHint">SHIFT · PRENDER A RESPIRAÇÃO</div>
+      <div class="breath" id="breathHint">SHIFT · HOLD BREATH</div>
     </div>
 
     <header id="topbar" class="hud hidden">
       <div class="brand-mini"><span class="brand-mark">H</span><span>HUNTERZ</span></div>
       <div class="mission">
-        <span class="mission__eyebrow">MISSÃO ATUAL</span>
-        <strong id="missionText">Rastreie a fauna</strong>
+        <span class="mission__eyebrow">CURRENT MISSION</span>
+        <strong id="missionText">Track the wildlife</strong>
       </div>
-      <div class="weather-chip" id="weatherChip"><span class="weather-dot"></span><span id="weatherLabel">Céu limpo</span></div>
+      <div class="weather-chip" id="weatherChip"><span class="weather-dot"></span><span id="weatherLabel">Clear sky</span></div>
     </header>
 
     <section id="hud" class="hud hidden" aria-live="polite">
-      <div class="compass" aria-label="Bússola">
-        <span id="compassLeft">NO</span><strong id="compassMain">N</strong><span id="compassRight">NE</span>
+      <div class="compass" aria-label="Compass">
+        <span id="compassLeft">NW</span><strong id="compassMain">N</strong><span id="compassRight">NE</span>
       </div>
-      <div id="threat" class="threat">⚠ PREDADOR À ESPREITA</div>
+      <div id="threat" class="threat">⚠ PREDATOR LURKING</div>
       <div id="crosshair" class="crosshair" aria-hidden="true"><i></i><b></b><em></em><span></span></div>
       <div id="dmgDir" class="dmg-dir" aria-hidden="true"></div>
       <div id="interactionHint" class="interaction-hint"></div>
@@ -45,121 +45,121 @@
       <div class="vitals">
         <div class="vital-row"><span class="ico">✚</span><div class="bar" id="hpBar"><u id="hpLag"></u><i id="hpFill"></i></div><strong id="hpText">100</strong></div>
         <div class="vital-row"><span class="ico">≋</span><div class="bar" id="stBar"><i id="stFill"></i></div><strong></strong></div>
-        <div class="bandages" id="bandages"><b id="bandageCount">3</b> ATADURAS · <kbd>Q</kbd> USAR</div>
+        <div class="bandages" id="bandages"><b id="bandageCount">3</b> BANDAGES · <kbd>Q</kbd> USE</div>
       </div>
 
       <aside class="status-panel">
-        <div class="status-line"><span>TEMPO DE CAÇADA</span><strong id="timer">00:00</strong></div>
-        <div class="status-line"><span>ANIMAIS RESTANTES</span><strong id="animalCount">0</strong></div>
-        <div class="status-line"><span>ABATES CONCLUÍDOS</span><strong id="killCount">0</strong></div>
-        <div class="sound-meter" aria-hidden="true"><span>RUÍDO</span><div><i id="soundLevel"></i></div></div>
+        <div class="status-line"><span>HUNT TIME</span><strong id="timer">00:00</strong></div>
+        <div class="status-line"><span>ANIMALS REMAINING</span><strong id="animalCount">0</strong></div>
+        <div class="status-line"><span>KILLS CONFIRMED</span><strong id="killCount">0</strong></div>
+        <div class="sound-meter" aria-hidden="true"><span>NOISE</span><div><i id="soundLevel"></i></div></div>
       </aside>
 
       <aside class="ammo-panel">
-        <div class="weapon-name">BOLT ACTION · .308 WIN · LUNETA 6×</div>
+        <div class="weapon-name">BOLT ACTION · .308 WIN · 6× SCOPE</div>
         <div class="ammo"><strong id="ammoCount">5</strong><span id="reserveCount">/ 45</span></div>
-        <div class="ammo-dots" id="ammoDots" aria-label="Munição no carregador"></div>
-        <div id="reloadHint">R PARA RECARREGAR</div>
+        <div class="ammo-dots" id="ammoDots" aria-label="Rounds in the magazine"></div>
+        <div id="reloadHint">R TO RELOAD</div>
       </aside>
 
-      <div class="controls-reminder"><kbd>WASD</kbd> mover <kbd>SHIFT</kbd> correr <kbd>C</kbd> agachar <kbd>ESPAÇO</kbd> pular <kbd>BOTÃO DIR.</kbd> luneta <kbd>CLIQUE</kbd> atirar <kbd>R</kbd> recarregar <kbd>Q</kbd> atadura <kbd>ESC</kbd> pausar</div>
+      <div class="controls-reminder"><kbd>WASD</kbd> move <kbd>SHIFT</kbd> sprint <kbd>C</kbd> crouch <kbd>SPACE</kbd> jump <kbd>RIGHT BUTTON</kbd> scope <kbd>CLICK</kbd> shoot <kbd>R</kbd> reload <kbd>Q</kbd> bandage <kbd>ESC</kbd> pause</div>
     </section>
 
     <section id="startScreen" class="overlay start-screen hidden">
       <div class="menu-card">
         <div class="menu-brand">
           <span class="menu-brand__line"></span>
-          <p>UMA CAÇADA NA NATUREZA SELVAGEM</p>
+          <p>A HUNT IN THE WILD</p>
           <h1>HUNTER<span>Z</span></h1>
-          <p class="tagline">Respire. Escute. A floresta também caça você.</p>
+          <p class="tagline">Breathe. Listen. The forest hunts you too.</p>
         </div>
         <div class="menu-actions">
-          <button id="startButton" class="primary-button" type="button"><span>INICIAR CAÇADA</span><small>Cervos, javalis, raposas, coelhos — e lobos e ursos que atacam</small></button>
+          <button id="startButton" class="primary-button" type="button"><span>START HUNT</span><small>Deer, boars, foxes, rabbits — plus wolves and bears that attack</small></button>
           <div class="setting-row">
-            <div><strong>Clima dinâmico</strong><small>Chuva forte com trovões</small></div>
-            <label class="switch"><input id="rainToggle" type="checkbox" /><span></span><b>CHUVA</b></label>
+            <div><strong>Dynamic weather</strong><small>Heavy rain with thunder</small></div>
+            <label class="switch"><input id="rainToggle" type="checkbox" /><span></span><b>RAIN</b></label>
           </div>
           <div class="setting-row quality-row">
-            <div><strong>Qualidade gráfica</strong><small>Alterar recarrega a floresta</small></div>
-            <select id="qualitySelect" aria-label="Qualidade gráfica">
-              <option value="baixa">BAIXA</option>
-              <option value="media">MÉDIA</option>
-              <option value="alta">ALTA</option>
+            <div><strong>Graphics quality</strong><small>Changing it reloads the forest</small></div>
+            <select id="qualitySelect" aria-label="Graphics quality">
+              <option value="low">LOW</option>
+              <option value="medium">MEDIUM</option>
+              <option value="high">HIGH</option>
             </select>
           </div>
           <div class="setting-row volume-row">
-            <div><strong>Volume</strong><small>Sons da floresta e da arma</small></div>
+            <div><strong>Volume</strong><small>Forest and rifle sounds</small></div>
             <input id="volumeSlider" type="range" min="0" max="100" value="75" aria-label="Volume" />
           </div>
           <details class="mini-ranking">
-            <summary><span>VER RANKING</span><b>TOP 10</b></summary>
-            <ol id="startRanking"><li class="empty-rank">Nenhum recorde ainda</li></ol>
+            <summary><span>VIEW LEADERBOARD</span><b>TOP 10</b></summary>
+            <ol id="startRanking"><li class="empty-rank">No records yet</li></ol>
           </details>
         </div>
         <div class="menu-footer">
-          <div><kbd>W A S D</kbd><span>MOVER</span></div>
-          <div><span class="mouse-icon">◉</span><span>MIRAR / ATIRAR</span></div>
-          <div><kbd>C</kbd><span>AGACHAR</span></div>
-          <div><kbd>Q</kbd><span>ATADURA</span></div>
+          <div><kbd>W A S D</kbd><span>MOVE</span></div>
+          <div><span class="mouse-icon">◉</span><span>AIM / SHOOT</span></div>
+          <div><kbd>C</kbd><span>CROUCH</span></div>
+          <div><kbd>Q</kbd><span>BANDAGE</span></div>
         </div>
       </div>
-      <p class="ethics">CAÇA VIRTUAL · NENHUM ANIMAL REAL FOI FERIDO</p>
+      <p class="ethics">VIRTUAL HUNT · NO REAL ANIMAL WAS HARMED</p>
     </section>
 
     <section id="pauseScreen" class="overlay pause-screen hidden">
       <div class="pause-card">
-        <p class="overline">CAÇADA PAUSADA</p>
-        <h2>A floresta espera.</h2>
-        <p>O cursor foi liberado. Retome quando estiver pronto.</p>
-        <button id="resumeButton" class="primary-button compact" type="button">VOLTAR À FLORESTA</button>
-        <button id="rainPauseButton" class="text-button" type="button">Alternar chuva</button>
-        <button id="restartButton" class="text-button" type="button">Reiniciar caçada</button>
+        <p class="overline">HUNT PAUSED</p>
+        <h2>The forest waits.</h2>
+        <p>The cursor has been released. Resume when you are ready.</p>
+        <button id="resumeButton" class="primary-button compact" type="button">BACK TO THE FOREST</button>
+        <button id="rainPauseButton" class="text-button" type="button">Toggle rain</button>
+        <button id="restartButton" class="text-button" type="button">Restart hunt</button>
       </div>
     </section>
 
     <section id="deathScreen" class="overlay death-screen hidden" aria-live="assertive">
       <div class="death-card">
-        <p class="overline" id="deathCause">ATACADO POR UM LOBO</p>
-        <h2>VOCÊ FOI ABATIDO</h2>
-        <p id="deathStats">Abates: 0 · Tempo: 00:00</p>
-        <button id="retryButton" class="primary-button compact" type="button">TENTAR NOVAMENTE</button>
+        <p class="overline" id="deathCause">ATTACKED BY A WOLF</p>
+        <h2>YOU WERE TAKEN DOWN</h2>
+        <p id="deathStats">Kills: 0 · Time: 00:00</p>
+        <button id="retryButton" class="primary-button compact" type="button">TRY AGAIN</button>
       </div>
     </section>
 
     <section id="endScreen" class="overlay pause-screen hidden" aria-live="polite">
       <div class="pause-card result-card">
-        <p class="overline">TODOS OS ANIMAIS ABATIDOS</p>
-        <h2>Caçada concluída.</h2>
+        <p class="overline">ALL ANIMALS DOWN</p>
+        <h2>Hunt complete.</h2>
         <div class="result-grid">
-          <div><strong id="finalKills">0</strong><span>ABATES</span></div>
-          <div><strong id="finalAccuracy">0%</strong><span>PRECISÃO</span></div>
-          <div><strong id="finalTime">00:00</strong><span>TEMPO</span></div>
+          <div><strong id="finalKills">0</strong><span>KILLS</span></div>
+          <div><strong id="finalAccuracy">0%</strong><span>ACCURACY</span></div>
+          <div><strong id="finalTime">00:00</strong><span>TIME</span></div>
         </div>
         <div id="rankingEntry" class="ranking-entry hidden">
-          <p>Você entrou no Top 10! Registre seu nome:</p>
-          <div><input id="playerName" type="text" maxlength="16" autocomplete="nickname" placeholder="SEU NOME" aria-label="Seu nome no ranking" /><button id="saveRankButton" type="button">SALVAR</button></div>
+          <p>You made the Top 10! Enter your name:</p>
+          <div><input id="playerName" type="text" maxlength="16" autocomplete="nickname" placeholder="YOUR NAME" aria-label="Your name on the leaderboard" /><button id="saveRankButton" type="button">SAVE</button></div>
           <small id="rankMessage"></small>
         </div>
-        <p id="notQualified" class="rank-note hidden">Continue tentando para entrar no Top 10.</p>
-        <button id="playAgainButton" class="primary-button compact" type="button">TENTAR NOVAMENTE</button>
+        <p id="notQualified" class="rank-note hidden">Keep trying to make the Top 10.</p>
+        <button id="playAgainButton" class="primary-button compact" type="button">TRY AGAIN</button>
       </div>
     </section>
 
     <section id="loadingScreen" class="overlay loading-screen" aria-live="polite">
       <div style="text-align:center">
         <div class="loader-mark">H</div>
-        <p>PREPARANDO A FLORESTA</p>
+        <p>PREPARING THE FOREST</p>
         <div class="loading-bar" style="margin:0 auto"><i id="loadFill"></i></div>
-        <div class="loading-msg" id="loadMsg">Carregando</div>
+        <div class="loading-msg" id="loadMsg">Loading</div>
         <div id="loadError" class="loading-error hidden" role="alert">
-          <span id="loadErrorDetail">Não foi possível preparar a floresta.</span>
-          <button id="retryLowButton" type="button">CARREGAR EM QUALIDADE BAIXA</button>
+          <span id="loadErrorDetail">Could not prepare the forest.</span>
+          <button id="retryLowButton" type="button">LOAD IN LOW QUALITY</button>
         </div>
       </div>
     </section>
 
     <section id="unsupported" class="overlay unsupported hidden">
-      <div class="pause-card"><h2>WebGL indisponível</h2><p>Seu navegador precisa oferecer suporte a WebGL 2 para entrar nesta floresta 3D.</p></div>
+      <div class="pause-card"><h2>WebGL unavailable</h2><p>Your browser needs WebGL 2 support to enter this 3D forest.</p></div>
     </section>
   </main>
 

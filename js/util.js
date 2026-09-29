@@ -1,4 +1,4 @@
-/* HUNTERZ — utilitários: RNG, ruído procedural, helpers de geometria e canvas. */
+/* HUNTERZ — utilities: RNG, procedural noise, geometry and canvas helpers. */
 (function () {
   'use strict';
   const HZ = (window.HZ = window.HZ || {});
@@ -23,7 +23,7 @@
   }
   HZ.hash2 = function (x, y, s = 0) { return hash2i(x | 0, y | 0, s | 0) / 4294967296; };
 
-  // ------------------------------------------------ Perlin 2D (tileável)
+  // ------------------------------------------------ Perlin 2D (tileable)
   const GX = new Float32Array(256), GY = new Float32Array(256);
   for (let i = 0; i < 256; i++) { const a = (i / 256) * Math.PI * 2; GX[i] = Math.cos(a); GY[i] = Math.sin(a); }
   function perlin(x, y, seed = 0, period = 0) {
@@ -63,7 +63,7 @@
   HZ.smooth = (a, b, v) => { const t = HZ.clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   HZ.angleDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 
-  // --------------------------------------------------- Canvas & texturas
+  // --------------------------------------------------- Canvas & textures
   HZ.canvas = function (w, h = w) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 
   HZ.tex = function (canvas, opt = {}) {
@@ -72,7 +72,7 @@
     t.colorSpace = opt.linear ? THREE.NoColorSpace : THREE.SRGBColorSpace;
     t.anisotropy = opt.aniso === false ? 1 : (HZ.maxAniso || 4);
     if (opt.repeat) t.repeat.set(opt.repeat[0], opt.repeat[1]);
-    // Mapas de alfa sem mipmaps: mipmaps de alfa geram "manchas pretas" na folhagem
+    // Alpha maps without mipmaps: alpha mipmaps create "black splotches" in foliage
     if (opt.noMip) {
       t.generateMipmaps = false;
       t.minFilter = THREE.LinearFilter;
@@ -84,7 +84,7 @@
     return t;
   };
 
-  // Gera uma textura pixel a pixel. fn(u,v,x,y) -> [r,g,b,(a)] em 0..255
+  // Generates a texture pixel by pixel. fn(u,v,x,y) -> [r,g,b,(a)] in 0..255
   HZ.pixelCanvas = function (w, h, fn) {
     const c = HZ.canvas(w, h), ctx = c.getContext('2d');
     const img = ctx.createImageData(w, h), d = img.data;
@@ -97,7 +97,7 @@
     return c;
   };
 
-  // Normal map a partir da luminância de um canvas (tileável)
+  // Normal map from the luminance of a canvas (tileable)
   HZ.normalFromCanvas = function (src, strength = 2, invert = false) {
     const w = src.width, h = src.height;
     const sd = src.getContext('2d').getImageData(0, 0, w, h).data;
@@ -116,8 +116,8 @@
     return c;
   };
 
-  // ------------------------------------------------ Geometria utilitária
-  // Mescla BufferGeometries (indexadas ou não) com os mesmos atributos.
+  // ------------------------------------------------ Utility geometry
+  // Merges BufferGeometries (indexed or not) with the same attributes.
   HZ.merge = function (geos) {
     geos = geos.filter(Boolean);
     if (!geos.length) return new THREE.BufferGeometry();
@@ -147,7 +147,7 @@
   function getComp(a, i, k) { return k === 0 ? a.getX(i) : k === 1 ? a.getY(i) : k === 2 ? a.getZ(i) : a.getW(i); }
   function indexify(g) { const n = g.attributes.position.count; const idx = []; for (let i = 0; i < n; i++) idx.push(i); g.setIndex(idx); return g; }
 
-  // Garante que a geometria tenha todos os atributos pedidos (preenche com default)
+  // Ensures the geometry has every requested attribute (fills in with defaults)
   HZ.ensureAttrs = function (g, spec) {
     const n = g.attributes.position.count;
     for (const [name, size, def] of spec) {
@@ -159,8 +159,8 @@
     return g;
   };
 
-  // Tubo ao longo de um caminho 3D com seção elíptica (a = meia-altura, b = meia-largura).
-  // opts: radial, ref (vetor lateral de referência), color(fn), wind(fn), capStart, capEnd, vScale, twist, radiusFn
+  // Tube along a 3D path with an elliptical section (a = half-height, b = half-width).
+  // opts: radial, ref (reference lateral vector), color(fn), wind(fn), capStart, capEnd, vScale, twist, radiusFn
   const _t = new THREE.Vector3(), _n = new THREE.Vector3(), _b = new THREE.Vector3(), _p = new THREE.Vector3();
   HZ.loft = function (path, sections, opts = {}) {
     const radial = opts.radial || 10;
@@ -176,7 +176,7 @@
       const p = path[i];
       if (i === 0) _t.subVectors(path[1], path[0]); else if (i === N - 1) _t.subVectors(path[N - 1], path[N - 2]); else _t.subVectors(path[i + 1], path[i - 1]);
       _t.normalize();
-      // frame: b = ref ortogonalizado; n = b x t
+      // frame: b = orthonormalized ref; n = b x t
       if (prevB && opts.transport) { _b.copy(prevB).addScaledVector(_t, -_t.dot(prevB)); }
       else { _b.copy(ref).addScaledVector(_t, -_t.dot(ref)); }
       if (_b.lengthSq() < 1e-6) { _b.set(1, 0, 0).addScaledVector(_t, -_t.x); }
@@ -208,7 +208,7 @@
       const a = i * row + k, b = a + 1, c = a + row, d = c + 1;
       idx.push(a, b, c, b, d, c);
     }
-    // tampas
+    // caps
     const cap = (i, flip) => {
       const center = path[i];
       const ci = pos.length / 3;
@@ -231,13 +231,13 @@
     return g;
   };
 
-  // Aplica uma Matrix4 e (opcionalmente) atributos constantes
+  // Applies a Matrix4 and (optionally) constant attributes
   HZ.xform = function (g, m) { g.applyMatrix4(m); return g; };
 
   HZ.colorArr = function (hex) { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
   HZ.mixArr = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-  // Shader chunk compartilhado de vento
+  // Shared wind shader chunk
   HZ.windUniforms = { uTime: { value: 0 }, uWind: { value: 1 } };
   HZ.WIND_PARS = `
     uniform float uTime; uniform float uWind;
