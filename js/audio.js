@@ -1,4 +1,4 @@
-/* HUNTERZ — áudio procedural (Web Audio) com som posicional 3D, reverberação de floresta e ambiência. */
+/* HUNTERZ — procedural audio (Web Audio) with 3D positional sound, forest reverb and ambience. */
 (function () {
   'use strict';
   const HZ = window.HZ;
@@ -15,7 +15,7 @@
       this.master.connect(comp); comp.connect(ctx.destination);
       this.sfx = ctx.createGain(); this.sfx.connect(this.master);
       this.amb = ctx.createGain(); this.amb.gain.value = 0.9; this.amb.connect(this.master);
-      // reverberação: resposta ao impulso gerada (floresta = difusa, longa, com ecos tardios)
+      // reverb: generated impulse response (forest = diffuse, long, with late echoes)
       this.verb = ctx.createConvolver(); this.verb.buffer = this.makeIR(3.2);
       this.verbSend = ctx.createGain(); this.verbSend.gain.value = 0.55;
       this.verbSend.connect(this.verb); this.verb.connect(this.master);
@@ -49,13 +49,13 @@
     }
     setVolume(v) { this.volume = v; if (this.master) this.master.gain.value = v; }
 
-    // destino: posicional (panner HRTF) ou direto
+    // destination: positional (HRTF panner) or direct
     out(pos, verb = 0.3) {
       const ctx = this.ctx, g = ctx.createGain();
       if (pos) {
         const p = new PannerNode(ctx, { panningModel: 'HRTF', distanceModel: 'inverse', refDistance: 3, maxDistance: 400, rolloffFactor: 1.2, positionX: pos.x, positionY: pos.y, positionZ: pos.z });
         g.connect(p); p.connect(this.sfx);
-        // ar abafa agudos à distância
+        // air muffles highs over distance
         if (this.listenerPos) { const d = Math.hypot(pos.x - this.listenerPos.x, pos.z - this.listenerPos.z); if (d > 30) { g.disconnect(); const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = Math.max(700, 14000 - d * 55); g.connect(lp); lp.connect(p); } }
       } else g.connect(this.sfx);
       if (verb > 0) { const s = ctx.createGain(); s.gain.value = verb; g.connect(s); s.connect(this.verbSend); }
@@ -98,13 +98,13 @@
       } else { L.setPosition(p.x, p.y, p.z); L.setOrientation(f.x, f.y, f.z, 0, 1, 0); }
     }
 
-    // -------------------------------------------------------- arma
+    // -------------------------------------------------------- weapon
     gunshot() {
       if (!this.enabled) return;
       this.noiseBurst({ dur: 0.09, type: 'highpass', f: 1800, Q: 0.7, gain: 1.0, a: 0.001, verb: 0.2 });
       this.noiseBurst({ dur: 0.5, type: 'lowpass', f: 2400, f1: 160, Q: 0.8, gain: 1.2, a: 0.001, verb: 1.0 });
       this.tone({ type: 'sine', f: 110, f1: 38, dur: 0.45, gain: 0.9, a: 0.002, verb: 0.6 });
-      // eco distante rolando pelo vale
+      // distant echo rolling through the valley
       this.noiseBurst({ dur: 1.6, type: 'lowpass', f: 900, f1: 200, gain: 0.18, a: 0.2, t0: 0.55, verb: 1.2, pink: true });
     }
     boltCycle() {
@@ -118,7 +118,7 @@
     dry() { this.noiseBurst({ dur: 0.04, type: 'bandpass', f: 3000, Q: 5, gain: 0.3, verb: 0 }); }
     aim(on) { this.noiseBurst({ dur: 0.12, type: 'bandpass', f: on ? 900 : 700, Q: 1, gain: 0.08, verb: 0 }); }
 
-    // -------------------------------------------------------- jogador
+    // -------------------------------------------------------- player
     step(surface, loud = 1) {
       if (!this.enabled) return;
       const g = 0.12 * loud;
@@ -128,7 +128,7 @@
       else if (surface === 'wood') { this.tone({ type: 'sine', f: 230, f1: 120, dur: 0.08, gain: g, verb: 0.05 }); this.noiseBurst({ dur: 0.04, type: 'bandpass', f: 800, Q: 2, gain: g * 0.5 }); }
       else if (surface === 'water') this.noiseBurst({ dur: 0.22, type: 'bandpass', f: 1200, f1: 500, Q: 1, gain: g * 1.2, verb: 0.05 });
       else this.noiseBurst({ dur: 0.08, type: 'lowpass', f: 700, Q: 0.7, gain: g * 1.2, verb: 0.02, pink: true });
-      if (Math.random() < 0.08) this.noiseBurst({ dur: 0.03, type: 'bandpass', f: 3500, Q: 6, gain: g * 0.9, t0: 0.03 }); // graveto estalando
+      if (Math.random() < 0.08) this.noiseBurst({ dur: 0.03, type: 'bandpass', f: 3500, Q: 6, gain: g * 0.9, t0: 0.03 }); // twig snapping
     }
     land(v) { this.noiseBurst({ dur: 0.15, type: 'lowpass', f: 400, gain: Math.min(0.5, v * 0.05), verb: 0.05 }); }
     hurt() {
@@ -140,7 +140,7 @@
     breath() { this.noiseBurst({ dur: 0.6, type: 'bandpass', f: 1100, Q: 0.8, gain: 0.05, a: 0.2, verb: 0, pink: true }); }
     bandage() { for (let i = 0; i < 4; i++) this.noiseBurst({ dur: 0.18, type: 'bandpass', f: 3000 + i * 300, Q: 0.8, gain: 0.1, t0: i * 0.3, verb: 0 }); }
 
-    // -------------------------------------------------------- impactos
+    // -------------------------------------------------------- impacts
     impact(kind, pos) {
       if (kind === 'flesh') { this.tone({ type: 'sine', f: 120, f1: 60, dur: 0.12, gain: 0.5, pos, verb: 0.2 }); this.noiseBurst({ dur: 0.12, type: 'lowpass', f: 900, gain: 0.4, pos, verb: 0.2 }); }
       else if (kind === 'tree' || kind === 'wood') { this.tone({ type: 'sine', f: 240, f1: 140, dur: 0.1, gain: 0.4, pos }); this.noiseBurst({ dur: 0.1, type: 'bandpass', f: 1200, Q: 1.5, gain: 0.35, pos }); }
@@ -148,7 +148,7 @@
       else this.noiseBurst({ dur: 0.12, type: 'lowpass', f: 600, gain: 0.35, pos, verb: 0.2, pink: true });
     }
 
-    // -------------------------------------------------------- animais
+    // -------------------------------------------------------- animals
     growl(pos, big) { this.tone({ type: 'sawtooth', f: big ? 62 : 95, f1: big ? 55 : 80, dur: big ? 1.6 : 1.0, gain: 0.5, a: 0.15, am: 0.6, amF: big ? 18 : 28, lp: big ? 500 : 800, pos, verb: 0.3 }); this.noiseBurst({ dur: big ? 1.4 : 0.9, type: 'bandpass', f: big ? 350 : 600, Q: 1, gain: 0.25, a: 0.2, pos, verb: 0.3 }); }
     roar(pos) {
       this.tone({ type: 'sawtooth', f: 120, curve: [110, 160, 150, 120, 80], dur: 2.0, gain: 0.8, a: 0.12, vib: 8, vibF: 7, lp: 1000, pos, verb: 0.8 });
@@ -164,7 +164,7 @@
     thud(pos, big) { this.tone({ type: 'sine', f: big ? 70 : 110, f1: 40, dur: 0.3, gain: big ? 0.7 : 0.4, pos, verb: 0.2 }); this.noiseBurst({ dur: 0.25, type: 'lowpass', f: 500, gain: 0.35, pos, verb: 0.2, pink: true }); }
     thunder() { this.noiseBurst({ dur: 4, type: 'lowpass', f: 400, f1: 60, gain: 0.9, a: 0.05, verb: 1.0, pink: true, t0: 0.6 + Math.random() * 1.5 }); }
 
-    // -------------------------------------------------------- ambiência
+    // -------------------------------------------------------- ambience
     loop(buf, filterType, f, Q, gain, dest) {
       const ctx = this.ctx, s = ctx.createBufferSource(); s.buffer = buf; s.loop = true;
       const fl = ctx.createBiquadFilter(); fl.type = filterType; fl.frequency.value = f; fl.Q.value = Q;
@@ -195,7 +195,7 @@
         const p = around(15 + Math.random() * 40), kind = Math.random();
         if (kind < 0.4) { const b = 2600 + Math.random() * 1500; for (let i = 0; i < 3 + (Math.random() * 4 | 0); i++) this.tone({ type: 'sine', f: b, f1: b * (0.7 + Math.random() * 0.6), dur: 0.08 + Math.random() * 0.06, gain: 0.05, pos: p, t0: i * 0.13, verb: 0.4 }); }
         else if (kind < 0.7) { this.tone({ type: 'sine', f: 3200, curve: [3000, 4200, 3600, 4400, 3100], dur: 0.5, gain: 0.04, pos: p, verb: 0.5 }); }
-        else { for (let i = 0; i < 2; i++) this.tone({ type: 'sine', f: 1600, f1: 1250, dur: 0.28, gain: 0.05, pos: p, t0: i * 0.45, verb: 0.6 }); } // cuco / pomba
+        else { for (let i = 0; i < 2; i++) this.tone({ type: 'sine', f: 1600, f1: 1250, dur: 0.28, gain: 0.05, pos: p, t0: i * 0.45, verb: 0.6 }); } // cuckoo / dove
       }
       if (this.nextPecker <= 0) { this.nextPecker = 15 + Math.random() * 25; const p = around(40 + Math.random() * 40); for (let i = 0; i < 14; i++) this.noiseBurst({ dur: 0.02, type: 'bandpass', f: 1300, Q: 4, gain: 0.12, pos: p, t0: i * 0.055, verb: 0.6 }); }
       if (this.nextCrow <= 0) { this.nextCrow = 25 + Math.random() * 30; const p = around(60); for (let i = 0; i < 3; i++) this.tone({ type: 'sawtooth', f: 620, f1: 480, dur: 0.22, gain: 0.07, lp: 1800, pos: p, t0: i * 0.35, verb: 0.8 }); }

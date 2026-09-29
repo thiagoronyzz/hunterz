@@ -1,4 +1,4 @@
-/* HUNTERZ — jogo: jogador (física, vida, estamina, ataduras), arma, HUD, clima, fluxo e ranking. */
+/* HUNTERZ — game: player (physics, health, stamina, bandages), weapon, HUD, weather, flow and leaderboard. */
 (async function () {
   'use strict';
   const HZ = window.HZ;
@@ -20,17 +20,17 @@
   };
   let lowRetryBound = false;
   const retryAtLow = () => {
-    try { localStorage.setItem('hunterz-quality', 'baixa'); } catch (_) {}
+    try { localStorage.setItem('hunterz-quality', 'low'); } catch (_) {}
     const retryUrl = new URL(location.href);
-    retryUrl.searchParams.set('q', 'baixa');
+    retryUrl.searchParams.set('q', 'low');
     location.replace(retryUrl.href);
   };
   const showLoadError = (error) => {
-    console.error('Falha ao iniciar Hunterz:', error);
+    console.error('Failed to start Hunterz:', error);
     UI.loading.classList.remove('hidden');
     UI.loadFill.style.width = '100%';
-    UI.loadMsg.textContent = 'Não foi possível preparar a floresta nesta qualidade.';
-    UI.loadErrorDetail.textContent = error && error.message ? error.message.slice(0, 180) : 'O dispositivo não conseguiu reservar recursos para esta configuração.';
+    UI.loadMsg.textContent = 'Could not prepare the forest at this quality.';
+    UI.loadErrorDetail.textContent = error && error.message ? error.message.slice(0, 180) : 'The device could not allocate resources for this configuration.';
     UI.loadError.classList.remove('hidden');
     if (!lowRetryBound) {
       UI.retryLow.addEventListener('click', retryAtLow, { once: true });
@@ -43,11 +43,14 @@
   const setLoading = (p, msg) => { UI.loadFill.style.width = Math.round(p * 100) + '%'; if (msg) UI.loadMsg.textContent = msg; };
   const tick = () => new Promise(r => setTimeout(r, 20));
 
-  // ---------------------------------------------------------------- qualidade
+  // ---------------------------------------------------------------- quality
   const QKEY = 'hunterz-quality';
+  // accepts legacy Portuguese quality ids saved in old localStorage/URLs
+  const QUALITY_ALIASES = { baixa: 'low', media: 'medium', alta: 'high' };
   const isMobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
-  let quality = params.get('q') || localStorage.getItem(QKEY) || (isMobile ? 'baixa' : 'media');
-  if (!HZ.QUALITY[quality]) quality = 'media';
+  let quality = params.get('q') || localStorage.getItem(QKEY) || (isMobile ? 'low' : 'medium');
+  quality = QUALITY_ALIASES[quality] || quality;
+  if (!HZ.QUALITY[quality]) quality = 'medium';
   UI.quality.value = quality;
   UI.quality.addEventListener('change', () => {
     try { localStorage.setItem(QKEY, UI.quality.value); } catch (_) {}
@@ -59,15 +62,15 @@
   const test = document.createElement('canvas');
   if (!test.getContext('webgl2')) { UI.loading.classList.add('hidden'); UI.unsupported.classList.remove('hidden'); return; }
 
-  // ---------------------------------------------------------------- renderizador
-  // Orçamentos por dispositivo: MSAA HDR + sombra 4K engasgam; alta fica em 2K/MSAA 2x.
+  // ---------------------------------------------------------------- renderer
+  // Per-device budgets: MSAA HDR + 4K shadows stutter; high stays at 2K/MSAA 2x.
   const q = { ...HZ.QUALITY[quality] };
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, depth: true, alpha: false });
   const memoryGB = Number(navigator.deviceMemory) || 0;
   const cores = Number(navigator.hardwareConcurrency) || 0;
   const constrainedDevice = isMobile || (memoryGB > 0 && memoryGB <= 4) || (cores > 0 && cores <= 4);
-  if (constrainedDevice && quality !== 'baixa') {
-    const high = quality === 'alta';
+  if (constrainedDevice && quality !== 'low') {
+    const high = quality === 'high';
     Object.assign(q, {
       variants: 2,
       treeStep: Math.max(q.treeStep, high ? 6.0 : 6.2),
@@ -89,8 +92,8 @@
     });
   }
   const screenPixels = Math.max(1, window.innerWidth * window.innerHeight);
-  // Orçamento mais conservador em alta: evita stutter em monitores 1440p/4K
-  const pixelBudget = constrainedDevice ? 2_200_000 : (quality === 'alta' ? 5_500_000 : 7_000_000);
+  // More conservative budget on high: avoids stutter on 1440p/4K monitors
+  const pixelBudget = constrainedDevice ? 2_200_000 : (quality === 'high' ? 5_500_000 : 7_000_000);
   const pixelRatio = Math.min(
     window.devicePixelRatio || 1,
     q.pixelRatio,
@@ -98,7 +101,7 @@
   );
   q.pixelRatio = Math.max(0.5, Math.round(pixelRatio * 100) / 100);
   const maxTex = renderer.capabilities.maxTextureSize || 4096;
-  // potências de 2 até 2048 (4K de sombra engasga e gera stutter)
+  // powers of two up to 2048 (4K shadows stutter and cause hitches)
   const shadowCaps = [512, 1024, 2048];
   const pickShadow = (want) => {
     let best = 512;
@@ -107,31 +110,31 @@
   };
   q.shadow = pickShadow(q.shadow);
   const targetPixels = screenPixels * q.pixelRatio * q.pixelRatio;
-  const heavyFrame = targetPixels > 2_200_000 || constrainedDevice || quality === 'baixa';
+  const heavyFrame = targetPixels > 2_200_000 || constrainedDevice || quality === 'low';
   if (targetPixels > 3_500_000 || constrainedDevice) q.shadow = pickShadow(Math.min(q.shadow, 1024));
   const maxSamples = renderer.capabilities.maxSamples || 0;
   q.samples = heavyFrame ? 0 : Math.min(q.samples || 0, maxSamples, 2);
-  if (heavyFrame && quality !== 'alta') q.bloom = false;
-  // Em alta com frame pesado, mantém bloom leve mas desliga MSAA
-  if (quality === 'alta' && heavyFrame) { q.samples = 0; q.bloom = true; }
+  if (heavyFrame && quality !== 'high') q.bloom = false;
+  // On high with a heavy frame, keep light bloom but turn MSAA off
+  if (quality === 'high' && heavyFrame) { q.samples = 0; q.bloom = true; }
   HZ.QUALITY[quality] = q;
   renderer.setPixelRatio(q.pixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  // PCF (sem Soft) é bem mais barato e reduz "manchas" de filtro amplo em folhas
+  // PCF (without Soft) is much cheaper and reduces wide-filter "splotches" on leaves
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.autoClear = true;
   UI.scene.appendChild(renderer.domElement);
   renderer.domElement.addEventListener('webglcontextlost', (event) => {
     event.preventDefault();
-    showLoadError(new Error('O contexto WebGL foi interrompido; tente novamente em qualidade baixa.'));
+    showLoadError(new Error('The WebGL context was lost; try again in low quality.'));
   });
   HZ.maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
-  const adaptedQuality = constrainedDevice && quality !== 'baixa';
-  const textureQuality = constrainedDevice && quality === 'alta' ? 'media' : quality;
-  setLoading(0.03, adaptedQuality ? 'Otimizando a floresta para este dispositivo' : 'Gerando texturas da floresta');
+  const adaptedQuality = constrainedDevice && quality !== 'low';
+  const textureQuality = constrainedDevice && quality === 'high' ? 'medium' : quality;
+  setLoading(0.03, adaptedQuality ? 'Optimizing the forest for this device' : 'Generating forest textures');
   await tick();
   HZ.textures.build(textureQuality);
   HZ.textures.toThree();
@@ -141,7 +144,7 @@
   scene.add(camera);
   const world = await HZ.buildWorld(renderer, scene, quality, (p, msg) => setLoading(0.08 + p * 0.8, msg));
   const physics = world.physics;
-  setLoading(0.9, 'Soltando os animais');
+  setLoading(0.9, 'Releasing the animals');
   await tick();
   const effects = new HZ.Effects(scene, camera, world);
   const audio = new HZ.Audio();
@@ -152,7 +155,7 @@
   animals.spawnAll(SPAWN);
   const BASE = { sun: world.sun.intensity, hemi: world.hemi.intensity, fogD: scene.fog.density, fogC: scene.fog.color.clone(), hor: world.skyU.uHorizon.value.clone(), zen: world.skyU.uZenith.value.clone() };
 
-  // ---------------------------------------------------------------- estado
+  // ---------------------------------------------------------------- state
   const MAG = 5, RESERVE = 45, BASE_DMG = 62;
   const RKEY = 'hunterz-ranking-v2';
   const P = {
@@ -175,14 +178,14 @@
   function updateAmmoUI() {
     UI.ammo.textContent = S.ammo; UI.reserve.textContent = '/ ' + S.reserve;
     UI.dots.innerHTML = ''; for (let i = 0; i < MAG; i++) { const d = document.createElement('i'); if (i >= S.ammo) d.className = 'empty'; UI.dots.appendChild(d); }
-    UI.reloadHint.textContent = S.ammo === 0 ? (S.reserve > 0 ? 'SEM MUNIÇÃO · R PARA RECARREGAR' : 'SEM MUNIÇÃO') : 'R PARA RECARREGAR';
+    UI.reloadHint.textContent = S.ammo === 0 ? (S.reserve > 0 ? 'OUT OF AMMO · R TO RELOAD' : 'OUT OF AMMO') : 'R TO RELOAD';
   }
   function updateAnimalUI() {
     const alive = animals.list.filter(a => !a.dead).length;
     UI.animalCount.textContent = alive; UI.killCount.textContent = S.kills;
-    UI.mission.textContent = S.kills >= S.total ? 'Missão concluída' : `Abata a fauna · ${S.kills}/${S.total}`;
+    UI.mission.textContent = S.kills >= S.total ? 'Mission complete' : `Take down the wildlife · ${S.kills}/${S.total}`;
   }
-  // mancha de sangue na tela (gerada)
+  // blood smear on screen (generated)
   (function makeBlood() {
     const c = document.createElement('canvas'); c.width = 512; c.height = 288; const g = c.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, 512, 288);
@@ -200,18 +203,18 @@
   function loadRankings() { try { const d = JSON.parse(localStorage.getItem(RKEY) || '[]'); return Array.isArray(d) ? d.filter(x => x && x.name && x.time).slice(0, 10) : []; } catch (_) { return []; } }
   function renderRanking() {
     const r = loadRankings(); UI.startRanking.innerHTML = '';
-    if (!r.length) { const li = document.createElement('li'); li.className = 'empty-rank'; li.textContent = 'Nenhum recorde ainda'; UI.startRanking.appendChild(li); return; }
+    if (!r.length) { const li = document.createElement('li'); li.className = 'empty-rank'; li.textContent = 'No records yet'; UI.startRanking.appendChild(li); return; }
     r.forEach(it => { const li = document.createElement('li'); li.append(document.createTextNode(it.name)); const t = document.createElement('span'); t.textContent = fmt(it.time); li.appendChild(t); UI.startRanking.appendChild(li); });
   }
   const qualifies = (t) => { const r = loadRankings(); return r.length < 10 || t < r[r.length - 1].time; };
   UI.saveRank.addEventListener('click', () => {
-    const name = (UI.playerName.value || '').trim().toUpperCase().slice(0, 16) || 'CAÇADOR';
+    const name = (UI.playerName.value || '').trim().toUpperCase().slice(0, 16) || 'HUNTER';
     const r = loadRankings(); r.push({ name, time: Math.max(1, Math.round(S.elapsed)), date: Date.now() }); r.sort((a, b) => a.time - b.time);
-    try { localStorage.setItem(RKEY, JSON.stringify(r.slice(0, 10))); UI.rankMessage.textContent = 'Recorde salvo no Top 10!'; UI.saveRank.disabled = true; UI.playerName.disabled = true; renderRanking(); } catch (_) { UI.rankMessage.textContent = 'Não foi possível salvar neste navegador.'; }
+    try { localStorage.setItem(RKEY, JSON.stringify(r.slice(0, 10))); UI.rankMessage.textContent = 'Record saved to the Top 10!'; UI.saveRank.disabled = true; UI.playerName.disabled = true; renderRanking(); } catch (_) { UI.rankMessage.textContent = 'Could not save in this browser.'; }
   });
   renderRanking();
 
-  // ---------------------------------------------------------------- entrada
+  // ---------------------------------------------------------------- input
   const canvas = renderer.domElement;
   const lock = () => { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (_) {} };
   document.addEventListener('pointerlockchange', () => {
@@ -244,7 +247,7 @@
   window.addEventListener('keyup', (e) => { S.keys[e.code] = false; });
   window.addEventListener('blur', () => { S.keys = {}; S.aimHeld = false; });
 
-  // ---------------------------------------------------------------- fluxo
+  // ---------------------------------------------------------------- flow
   function resetPlayer() {
     P.pos.set(SPAWN.x, HZ.heightAt(SPAWN.x, SPAWN.z), SPAWN.z); P.vel.set(0, 0, 0); P.knock.set(0, 0, 0);
     P.yaw = 0; P.pitch = 0; P.hp = 100; P.hpLag = 100; P.stamina = 100; P.alive = true; P.bandages = 3; P.bandaging = 0; P.bleeding = 0;
@@ -262,7 +265,7 @@
     updateAmmoUI(); updateAnimalUI();
     world.forceUpdate();
     lock();
-    toast('Cuidado: lobos, ursos e javalis podem atacar. Boa caçada.', 3500);
+    toast('Careful: wolves, bears and boars can attack. Good hunting.', 3500);
   }
   function restartGame() {
     effects.clear();
@@ -272,7 +275,7 @@
   }
   function pauseGame() { if (S.mode !== 'playing') return; S.mode = 'paused'; S.pauseAt = performance.now(); UI.pause.classList.remove('hidden'); S.keys = {}; S.aimHeld = false; }
   function resumeGame() { if (S.mode !== 'paused') return; S.startTime += performance.now() - S.pauseAt; S.mode = 'playing'; UI.pause.classList.add('hidden'); lock(); }
-  function setRain(on) { S.rain = on; UI.rain.checked = on; UI.weather.classList.toggle('rain', on); UI.weatherLabel.textContent = on ? 'Chuva forte' : 'Céu limpo'; }
+  function setRain(on) { S.rain = on; UI.rain.checked = on; UI.weather.classList.toggle('rain', on); UI.weatherLabel.textContent = on ? 'Heavy rain' : 'Clear sky'; }
   UI.startBtn.addEventListener('click', startGame);
   UI.resume.addEventListener('click', resumeGame);
   UI.restart.addEventListener('click', restartGame);
@@ -291,7 +294,7 @@
     UI.end.classList.remove('hidden'); UI.hud.classList.add('hidden');
   }
 
-  // ---------------------------------------------------------------- dano ao jogador
+  // ---------------------------------------------------------------- player damage
   function damagePlayer(dmg, src, knock) {
     if (!P.alive || S.mode !== 'playing') return;
     P.hp -= dmg; P.lastHurt = S.time; P.hurt = Math.min(1, P.hurt + dmg / 30 + 0.35); P.shake = Math.min(1, P.shake + dmg / 25);
@@ -311,12 +314,12 @@
   function killPlayer(src) {
     P.hp = 0; P.alive = false; P.deathT = 0; P.killer = src;
     S.aimHeld = false; S.aim = 0;
-    const names = { wolf: 'UM LOBO', bear: 'UM URSO', boar: 'UM JAVALI' };
-    UI.deathCause.textContent = src ? `ATACADO POR ${names[src.type] || 'UM ANIMAL'}` : 'VOCÊ SANGROU ATÉ A MORTE';
+    const names = { wolf: 'A WOLF', bear: 'A BEAR', boar: 'A BOAR' };
+    UI.deathCause.textContent = src ? `ATTACKED BY ${names[src.type] || 'AN ANIMAL'}` : 'YOU BLED OUT';
     audio.heartbeat(1.5);
   }
 
-  // ---------------------------------------------------------------- arma
+  // ---------------------------------------------------------------- weapon
   function reload() {
     if (!P.alive || rifle.state !== 'ready' || S.ammo >= MAG || S.reserve <= 0 || P.bandaging > 0) return;
     const n = Math.min(MAG - S.ammo, S.reserve);
@@ -327,20 +330,20 @@
   }
   function useBandage() {
     if (!P.alive || P.bandaging > 0) return;
-    if (P.bandages <= 0) { hintBottom('SEM ATADURAS'); return; }
-    if (P.hp >= 100 && P.bleeding <= 0) { hintBottom('VIDA CHEIA'); return; }
-    P.bandaging = 2.6; P.bandages--; audio.bandage(); UI.bandages.classList.add('using'); hintBottom('APLICANDO ATADURA...', 2.6);
+    if (P.bandages <= 0) { hintBottom('NO BANDAGES'); return; }
+    if (P.hp >= 100 && P.bleeding <= 0) { hintBottom('HEALTH FULL'); return; }
+    P.bandaging = 2.6; P.bandages--; audio.bandage(); UI.bandages.classList.add('using'); hintBottom('APPLYING BANDAGE...', 2.6);
   }
   const _o = V(), _d = V(), _m = V(), _r = V(), _u = V();
   function shoot() {
     if (!P.alive || P.bandaging > 0) return;
     if (rifle.state !== 'ready') return;
-    if (S.ammo <= 0) { audio.dry(); hintBottom(S.reserve > 0 ? 'SEM MUNIÇÃO · PRESSIONE R' : 'SEM MUNIÇÃO'); return; }
+    if (S.ammo <= 0) { audio.dry(); hintBottom(S.reserve > 0 ? 'OUT OF AMMO · PRESS R' : 'OUT OF AMMO'); return; }
     S.ammo--; S.shots++;
     P.sprintLock = 0.35;
     rifle.fire(); audio.gunshot();
     camera.updateMatrixWorld();
-    // dispersão: mínima com luneta; maior em movimento/no ar
+    // spread: minimal when scoped; larger while moving/in the air
     const scoped = S.aim > 0.85;
     let spread = scoped ? 0.0004 : 0.018 + P.moveAmt * 0.03 + (P.onGround ? 0 : 0.06);
     if (P.crouch) spread *= 0.7;
@@ -364,27 +367,27 @@
         const dist = Math.round(ha.distance);
         setTimeout(() => audio.impact('flesh', ha.point), Math.min(900, ha.distance / 0.34));
         hitMarker(res.killed);
-        const zone = { head: 'CABEÇA', neck: 'PESCOÇO', body: res.vital ? 'CORAÇÃO/PULMÃO' : 'CORPO', leg: 'PERNA' }[res.zone];
-        if (!res.killed) feed(`${an.sp.name} ferido · ${zone} <b>${dist} m</b>`, true);
-        if (!res.killed && an.sp.hostile === 'prey') hintBottom('ANIMAL FERIDO · SIGA O RASTRO DE SANGUE', 3);
+        const zone = { head: 'HEAD', neck: 'NECK', body: res.vital ? 'HEART/LUNG' : 'BODY', leg: 'LEG' }[res.zone];
+        if (!res.killed) feed(`${an.sp.name} hit · ${zone} <b>${dist} m</b>`, true);
+        if (!res.killed && an.sp.hostile === 'prey') hintBottom('ANIMAL HIT · FOLLOW THE BLOOD TRAIL', 3);
       }
     } else if (hw) {
       effects.impact(hw.kind, hw.point, hw.normal);
       setTimeout(() => audio.impact(hw.kind, hw.point), Math.min(900, hw.t / 0.34));
     }
     updateAmmoUI();
-    if (S.ammo === 0 && S.reserve > 0) setTimeout(() => { if (S.ammo === 0) hintBottom('PRESSIONE R PARA RECARREGAR', 2.5); }, 900);
+    if (S.ammo === 0 && S.reserve > 0) setTimeout(() => { if (S.ammo === 0) hintBottom('PRESS R TO RELOAD', 2.5); }, 900);
   }
   animals.onKillCb = (a, zone) => {
     S.kills++;
-    const zn = { head: 'tiro na cabeça', neck: 'tiro no pescoço', body: 'tiro no corpo', leg: 'tiro na perna' }[zone] || 'sangramento';
+    const zn = { head: 'head shot', neck: 'neck shot', body: 'body shot', leg: 'leg shot' }[zone] || 'bleed out';
     const bonus = zone === 'head' ? 2 : zone === 'neck' ? 1.5 : 1;
-    feed(`${a.sp.name} abatido · ${zn} <b>+${Math.round(a.sp.points * bonus)}</b>`);
+    feed(`${a.sp.name} down · ${zn} <b>+${Math.round(a.sp.points * bonus)}</b>`);
     updateAnimalUI();
     if (S.kills >= S.total) setTimeout(finishSession, 1500);
   };
 
-  // ---------------------------------------------------------------- jogador
+  // ---------------------------------------------------------------- player
   const BOUND = world.BOUND;
   function surfaceAt(x, z, y) {
     if (HZ.isWater(x, z, -0.05)) return 'water';
@@ -412,11 +415,11 @@
     const tx = (fx * iz + rx * ix) * speed, tz = (fz * iz + rz * ix) * speed;
     const acc = P.onGround ? 11 : 2;
     P.vel.x += (tx - P.vel.x) * Math.min(1, acc * dt); P.vel.z += (tz - P.vel.z) * Math.min(1, acc * dt);
-    // pulo
+    // jump
     if (alive && k.Space && P.onGround && P.stamina > 8 && !P.crouch) { P.vel.y = 5.3; P.onGround = false; P.stamina -= 10; }
     if (alive && k.Space && P.crouch) P.crouch = false;
     P.vel.y -= 17 * dt;
-    // empurrão por ataques
+    // knockback from attacks
     P.knock.multiplyScalar(Math.exp(-6 * dt));
     const mx = (P.vel.x + P.knock.x) * dt, mz = (P.vel.z + P.knock.z) * dt;
     const p = { x: P.pos.x, y: P.pos.y, z: P.pos.z };
@@ -429,14 +432,14 @@
       P.pos.y = g; P.vel.y = 0; P.onGround = true;
     } else if (P.onGround && P.vel.y <= 0 && P.pos.y - g < 0.55) { P.pos.y = g; P.vel.y = 0; }
     else { P.pos.y = ny; P.onGround = false; }
-    // estamina
+    // stamina
     if (P.sprinting && Math.hypot(P.vel.x, P.vel.z) > 3) { P.stamina -= 15 * dt; P.staminaT = 1; }
     else if (P.holdBreath) P.stamina -= 20 * dt;
     else { P.staminaT = (P.staminaT || 0) - dt; if (P.staminaT <= 0) P.stamina += 12 * dt; }
     P.stamina = HZ.clamp(P.stamina, 0, 100);
-    // agachar suave
+    // smooth crouch
     P.crouchT += ((P.crouch ? 1 : 0) - P.crouchT) * Math.min(1, dt * 9);
-    // passos e balanço
+    // footsteps and bobbing
     const hs = Math.hypot(P.vel.x, P.vel.z);
     P.moving = hs > 0.4;
     P.moveAmt += ((P.onGround ? Math.min(1, hs / 3.5) : 0) - P.moveAmt) * Math.min(1, dt * 8);
@@ -446,26 +449,26 @@
       const st = Math.floor(P.bobPhase / Math.PI);
       if (st !== P.lastStep) { P.lastStep = st; audio.step(surfaceAt(P.pos.x, P.pos.z, P.pos.y), P.sprinting ? 1.4 : P.crouch ? 0.35 : 0.8); }
     }
-    // ruído do jogador (percebido pelos animais)
+    // player noise (heard by animals)
     const nTarget = !P.moving ? 0.02 : P.sprinting ? 1 : P.crouch ? 0.12 : 0.42;
     P.noise += (nTarget - P.noise) * Math.min(1, dt * (nTarget > P.noise ? 6 : 1.2));
-    // vida: sangramento, regeneração lenta até 50, ataduras
+    // health: bleeding, slow regeneration up to 50, bandages
     if (P.alive) {
       if (P.bleeding > 0) { P.hp -= 1.1 * dt; P.bleeding -= dt; if (Math.random() < dt * 2) effects.groundDecal(P.pos.x + (Math.random() - 0.5) * 0.4, P.pos.z + (Math.random() - 0.5) * 0.4, 0.08 + Math.random() * 0.08, 0, 0.9); if (P.hp <= 0) killPlayer(null); }
       if (S.time - P.lastHurt > 9 && P.hp < 50 && P.bleeding <= 0) P.hp = Math.min(50, P.hp + 1.0 * dt);
       if (P.bandaging > 0) {
         P.bandaging -= dt;
-        if (P.bandaging <= 0) { P.hp = Math.min(100, P.hp + 40); P.bleeding = 0; UI.bandages.classList.remove('using'); toast('Ferimentos enfaixados · +40 de vida'); }
+        if (P.bandaging <= 0) { P.hp = Math.min(100, P.hp + 40); P.bleeding = 0; UI.bandages.classList.remove('using'); toast('Wounds bandaged · +40 health'); }
       }
     }
     P.hpLag += (P.hp - P.hpLag) * Math.min(1, dt * 1.5);
   }
 
-  // ---------------------------------------------------------------- câmera
+  // ---------------------------------------------------------------- camera
   function updateCamera(dt) {
     const eyeH = HZ.lerp(1.68, 1.08, P.crouchT);
     const target = P.pos.y + eyeH;
-    // suaviza degraus (subida de pedras/troncos) sem atrasar pulos
+    // smooth steps (climbing rocks/logs) without delaying jumps
     if (Math.abs(target - P.eyeY) > 1.2) P.eyeY = target;
     P.eyeY += (target - P.eyeY) * Math.min(1, dt * (P.onGround ? 14 : 30));
     let cx = P.pos.x, cy = P.eyeY, cz = P.pos.z;
@@ -473,9 +476,9 @@
     cy += -Math.abs(Math.sin(P.bobPhase)) * 0.045 * bob * (P.sprinting ? 1.5 : 1) + 0.02 * bob;
     const side = Math.cos(P.bobPhase) * 0.025 * bob;
     cx += Math.cos(P.yaw) * side; cz += -Math.sin(P.yaw) * side;
-    // recuo da câmera
+    // camera recoil
     S.recoilPitch *= Math.exp(-9 * dt); S.recoilYaw *= Math.exp(-9 * dt);
-    // oscilação da luneta (respiração, cansaço, movimento)
+    // scope sway (breathing, fatigue, movement)
     let swx = 0, swy = 0;
     const scoped = S.aim > 0.85;
     const shift = S.keys.ShiftLeft || S.keys.ShiftRight;
@@ -487,11 +490,11 @@
       swx = (Math.sin(t * 0.61) * 0.7 + Math.sin(t * 1.73 + 1) * 0.3) * amp;
       swy = (Math.sin(t * 1.22 + 2) * 0.6 + Math.sin(t * 0.37) * 0.4) * amp * 0.8;
     }
-    // tremor ao receber dano
+    // shake when taking damage
     P.shake *= Math.exp(-4 * dt);
     const sh = P.shake * 0.03;
     const shx = (Math.random() - 0.5) * sh, shy = (Math.random() - 0.5) * sh;
-    // morte: queda ao chão
+    // death: fall to the ground
     let roll = 0, dp = 0;
     if (!P.alive) {
       P.deathT += dt; const a = Math.min(1, P.deathT / 1.1), e = a * a * (3 - 2 * a);
@@ -499,7 +502,7 @@
     }
     camera.position.set(cx, cy, cz);
     camera.rotation.set(P.pitch + S.recoilPitch + swy + shy + dp, P.yaw + S.recoilYaw + swx + shx, roll + Math.sin(P.bobPhase) * 0.004 * bob);
-    // FOV / luneta
+    // FOV / scope
     let fov;
     if (S.aim < 0.85) fov = HZ.lerp(72, 56, S.aim / 0.85); else fov = 12;
     if (P.sprinting) fov += 4;
@@ -510,7 +513,7 @@
     UI.breath.style.opacity = scoped ? (P.holdBreath ? 0.25 : 0.7) : 0;
   }
 
-  // ---------------------------------------------------------------- clima
+  // ---------------------------------------------------------------- weather
   function updateWeather(dt) {
     S.rainAmt += ((S.rain ? 1 : 0) - S.rainAmt) * Math.min(1, dt * 0.5);
     const r = S.rainAmt;
@@ -531,8 +534,8 @@
     } else world.skyU.uFlash.value = 0;
   }
 
-  // ---------------------------------------------------------------- HUD por quadro
-  const DIRS = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
+  // ---------------------------------------------------------------- HUD per frame
+  const DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
   function updateHUD(dt) {
     const hp = Math.max(0, P.hp);
     UI.hpFill.style.width = hp + '%'; UI.hpLag.style.width = Math.max(hp, P.hpLag) + '%'; UI.hpText.textContent = Math.ceil(hp);
@@ -552,9 +555,9 @@
     post.u.uDamage.value = Math.min(1, P.hurt * 0.9 + low * (0.35 + 0.25 * Math.sin(S.time * 5)));
     post.u.uLow.value = low;
     post.u.uDead.value = P.alive ? 0 : Math.min(1, P.deathT / 1.5);
-    // batimentos com pouca vida
+    // heartbeat at low health
     if (P.alive && hp < 30 && S.time - S.lastHeart > 0.95 - (30 - hp) / 60) { S.lastHeart = S.time; audio.heartbeat(0.6 + low * 0.6); }
-    // dica ao olhar um animal abatido
+    // hint when looking at a downed animal
     if (S.mode === 'playing' && P.alive) {
       let txt = '';
       for (const a of animals.list) {
@@ -562,13 +565,13 @@
         const d = a.pos.distanceTo(P.pos); if (d > 4) continue;
         _d.set(a.x - camera.position.x, a.y + 0.3 - camera.position.y, a.z - camera.position.z).normalize();
         camera.getWorldDirection(_u);
-        if (_u.dot(_d) > 0.85) { txt = `${a.sp.name.toUpperCase()} ABATIDO`; break; }
+        if (_u.dot(_d) > 0.85) { txt = `${a.sp.name.toUpperCase()} DOWN`; break; }
       }
       UI.hint.textContent = txt;
     }
   }
 
-  // ---------------------------------------------------------------- redimensionar
+  // ---------------------------------------------------------------- resize
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h);
@@ -590,14 +593,14 @@
   let last = performance.now(), frames = 0, fpsT = 0;
   const _eyeP = V();
   const TEST = params.get('test') === '1';
-  // Escala dinâmica: se o FPS cair, alivia grama/sombra por alguns segundos
+  // Dynamic scaling: if FPS drops, ease off grass/shadows for a few seconds
   let perfScale = 1, perfCool = 0;
   const baseGrassR = (HZ.sharedUniforms && HZ.sharedUniforms.uFadeGrass) ? HZ.sharedUniforms.uFadeGrass.value.clone() : null;
   function applyPerfScale(s) {
     if (!HZ.sharedUniforms || !HZ.sharedUniforms.uFadeGrass || !baseGrassR) return;
     const f = 0.55 + 0.45 * s;
     HZ.sharedUniforms.uFadeGrass.value.set(baseGrassR.x * f, baseGrassR.y * f);
-    // desliga sombra só em stutter grave; reativa depois
+    // disable shadows only on severe stutter; re-enable later
     renderer.shadowMap.enabled = s > 0.4;
   }
   function frame(now) {
@@ -608,7 +611,7 @@
     const t = S.time;
 
     if (S.mode === 'menu') {
-      // câmera cinematográfica lenta no menu
+      // slow cinematic camera in the menu
       const a = t * 0.035;
       camera.position.set(SPAWN.x + Math.sin(a) * 3, HZ.heightAt(SPAWN.x, SPAWN.z) + 1.9, SPAWN.z + Math.cos(a) * 3);
       camera.rotation.set(-0.02 + Math.sin(t * 0.1) * 0.02, a * 0.9 + 0.6, 0);
@@ -616,13 +619,13 @@
       camera.updateMatrixWorld();
     } else if (S.mode === 'playing' || S.mode === 'ended') {
       updatePlayer(dt);
-      // mira com luneta
+      // scope aiming
       const canAim = S.aimHeld && P.alive && rifle.state !== 'reloading' && P.bandaging <= 0 && !P.sprinting;
       S.aim = HZ.clamp(S.aim + (canAim ? 4.2 : -6) * dt, 0, 1);
       if (S.fire) { S.fire = false; if (P.sprinting) P.sprinting = false; shoot(); }
       updateCamera(dt);
       if (!P.alive && P.deathT > 2.2 && UI.death.classList.contains('hidden')) {
-        UI.deathStats.textContent = `Abates: ${S.kills}/${S.total} · Tempo: ${fmt(S.elapsed)}`;
+        UI.deathStats.textContent = `Kills: ${S.kills}/${S.total} · Time: ${fmt(S.elapsed)}`;
         UI.death.classList.remove('hidden'); UI.hud.classList.add('hidden');
         document.exitPointerLock && document.exitPointerLock();
         S.mode = 'dead';
@@ -632,17 +635,17 @@
       updateCamera(dt);
     }
 
-    // animais
+    // animals
     G.player.crouch = P.crouch; G.player.moving = P.moving; G.player.noise = P.noise; G.player.alive = P.alive && S.mode === 'playing';
     G.rain = S.rain; G.time = t; G.huntPressure = S.huntPressure;
     if (dt > 0) animals.update(dt, G);
 
-    // mundo e efeitos
+    // world and effects
     updateWeather(dt);
     world.update(camera, dt, t);
     env.rain = S.rainAmt > 0.5; env.pointScale = S.pointScale || 600;
     if (dt > 0) effects.update(dt, t, camera, env);
-    // arma
+    // weapon
     const showGun = S.mode === 'playing' && P.alive;
     rifle.root.visible = showGun;
     if (showGun) {
@@ -661,8 +664,8 @@
     frames++; fpsT += (now - (frame.prev || now)) / 1000; frame.prev = now;
     if (fpsT > 1) {
       HZ.fps = frames / fpsT; frames = 0; fpsT = 0;
-      // adaptação automática só em qualidade alta/média (evita hitch e manchas por overload)
-      if (quality !== 'baixa' && S.mode === 'playing') {
+      // automatic adaptation only on high/medium quality (avoids hitching and overload splotches)
+      if (quality !== 'low' && S.mode === 'playing') {
         if (HZ.fps < 28) { perfScale = Math.max(0.35, perfScale - 0.2); perfCool = 4; applyPerfScale(perfScale); }
         else if (HZ.fps < 40) { perfScale = Math.max(0.55, perfScale - 0.1); perfCool = 2.5; applyPerfScale(perfScale); }
         else if (perfCool > 0) { perfCool -= 1; }
@@ -671,11 +674,11 @@
     }
   }
 
-  // pré-compila shaders para evitar travadas no primeiro disparo
-  setLoading(0.95, 'Compilando shaders');
+  // pre-compile shaders to avoid hitches on the first shot
+  setLoading(0.95, 'Compiling shaders');
   await tick();
   try { renderer.compile(scene, camera); renderer.compile(rifle.scene, camera); } catch (_) {}
-  setLoading(1, 'Pronto');
+  setLoading(1, 'Ready');
   UI.loading.classList.add('hidden');
   S.mode = 'menu';
   UI.start.classList.remove('hidden');
@@ -683,7 +686,7 @@
   let fakeNow = performance.now();
   const stepFrames = (n = 1, dt = 1 / 30, render = true) => { S.noRender = !render; for (let i = 0; i < n; i++) { fakeNow += dt * 1000; frame(fakeNow); } S.noRender = false; return true; };
 
-  // modos de teste/preview via URL (?preview=animals|play)
+  // test/preview modes via URL (?preview=animals|play)
   HZ.game = { stepFrames, P, S, animals, world, camera, startGame, damagePlayer, shoot, effects, rifle, scene, renderer, setRain };
   if (params.get('rain') === '1') setRain(true);
   } catch (error) {

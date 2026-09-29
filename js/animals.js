@@ -1,6 +1,6 @@
-/* HUNTERZ — fauna: corpos anatômicos procedurais, locomoção com marchas (passo/trote/galope/salto),
-   IA de presas (percepção, alerta, fuga) e predadores (perseguição, cerco, ataque),
-   ferimentos com sangramento e morte realista (o animal tomba de lado e fica ensanguentado). */
+/* HUNTERZ — wildlife: procedural anatomical bodies, locomotion with gaits (walk/trot/gallop/hop),
+   prey AI (perception, alert, flight) and predators (chase, circling, attack),
+   wounds with bleeding and realistic death (the animal topples on its side and gets bloody). */
 (function () {
   'use strict';
   const HZ = window.HZ;
@@ -8,11 +8,11 @@
   const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
   const TAU = Math.PI * 2;
 
-  // ------------------------------------------------------------------ espécies
-  // Corpo: [x, y, a(meia-altura), b(meia-largura)] em metros; x = frente, y = cima.
+  // ------------------------------------------------------------------ species
+  // Body: [x, y, a(half-height), b(half-width)] in meters; x = front, y = up.
   const SPECIES = {
     deer: {
-      name: 'Cervo', hostile: 'prey', hp: 100, walk: 1.3, run: 9.2, turn: 2.6, radius: 0.5, sight: 48, hearing: 55, points: 150, vital: [0.12, 0.6],
+      name: 'Deer', hostile: 'prey', hp: 100, walk: 1.3, run: 9.2, turn: 2.6, radius: 0.5, sight: 48, hearing: 55, points: 150, vital: [0.12, 0.6],
       body: [[-0.8, 1.0, 0.03, 0.03], [-0.76, 1.0, 0.17, 0.13], [-0.66, 1.0, 0.26, 0.19], [-0.48, 0.99, 0.3, 0.22], [-0.25, 0.97, 0.3, 0.23], [0, 0.97, 0.31, 0.23], [0.25, 1.0, 0.32, 0.22], [0.45, 1.04, 0.3, 0.19], [0.58, 1.08, 0.24, 0.15], [0.64, 1.12, 0.1, 0.08]],
       neck: { at: [0.5, 1.12], pts: [[0, 0, 0.17, 0.12], [0.1, 0.2, 0.14, 0.1], [0.2, 0.42, 0.11, 0.085], [0.26, 0.56, 0.1, 0.08]] },
       head: { pts: [[0.2, 0.64, 0.03, 0.03], [0.23, 0.66, 0.1, 0.085], [0.31, 0.64, 0.105, 0.08], [0.4, 0.58, 0.08, 0.06], [0.48, 0.52, 0.06, 0.045], [0.53, 0.49, 0.045, 0.035], [0.55, 0.48, 0.01, 0.01]], eye: [0.335, 0.675, 0.074, 0.018], ear: { at: [0.26, 0.72, 0.065], dir: [-0.35, 0.55, 0.75], len: 0.17, wid: 0.055 } },
@@ -23,7 +23,7 @@
       graze: -1.25, grazes: true,
     },
     wolf: {
-      name: 'Lobo', hostile: 'predator', hp: 75, walk: 1.5, run: 7.8, turn: 4.0, radius: 0.45, sight: 60, hearing: 60, points: 220, vital: [0.1, 0.5], dmg: [8, 12], reach: 1.55, cd: 2.0,
+      name: 'Wolf', hostile: 'predator', hp: 75, walk: 1.5, run: 7.8, turn: 4.0, radius: 0.45, sight: 60, hearing: 60, points: 220, vital: [0.1, 0.5], dmg: [8, 12], reach: 1.55, cd: 2.0,
       body: [[-0.58, 0.72, 0.03, 0.03], [-0.54, 0.72, 0.13, 0.11], [-0.44, 0.72, 0.18, 0.14], [-0.25, 0.71, 0.19, 0.15], [0, 0.72, 0.21, 0.16], [0.22, 0.73, 0.25, 0.17], [0.38, 0.75, 0.25, 0.16], [0.48, 0.78, 0.2, 0.14], [0.53, 0.8, 0.08, 0.07]],
       neck: { at: [0.42, 0.8], pts: [[0, 0, 0.15, 0.12], [0.1, 0.07, 0.13, 0.1], [0.2, 0.13, 0.11, 0.09]] },
       head: { pts: [[0.17, 0.16, 0.03, 0.03], [0.2, 0.17, 0.1, 0.095], [0.28, 0.16, 0.1, 0.09], [0.36, 0.12, 0.065, 0.055], [0.45, 0.09, 0.045, 0.04], [0.5, 0.08, 0.035, 0.03], [0.52, 0.08, 0.01, 0.01]], eye: [0.32, 0.2, 0.06, 0.013], ear: { at: [0.24, 0.25, 0.055], dir: [-0.15, 0.95, 0.3], len: 0.12, wid: 0.055 } },
@@ -34,7 +34,7 @@
       graze: -0.9,
     },
     bear: {
-      name: 'Urso', hostile: 'predator', hp: 260, walk: 1.2, run: 7.2, turn: 2.2, radius: 0.8, sight: 42, hearing: 45, points: 400, vital: [0.1, 0.6], dmg: [24, 34], reach: 2.1, cd: 2.1, big: true,
+      name: 'Bear', hostile: 'predator', hp: 260, walk: 1.2, run: 7.2, turn: 2.2, radius: 0.8, sight: 42, hearing: 45, points: 400, vital: [0.1, 0.6], dmg: [24, 34], reach: 2.1, cd: 2.1, big: true,
       body: [[-0.85, 0.95, 0.03, 0.03], [-0.8, 0.95, 0.3, 0.28], [-0.65, 0.97, 0.42, 0.38], [-0.4, 0.98, 0.46, 0.42], [-0.1, 1.0, 0.47, 0.43], [0.2, 1.06, 0.48, 0.41], [0.42, 1.08, 0.44, 0.37], [0.6, 1.05, 0.34, 0.3], [0.7, 1.02, 0.12, 0.12]],
       neck: { at: [0.6, 1.02], pts: [[0, 0, 0.3, 0.28], [0.14, -0.02, 0.26, 0.24], [0.26, -0.04, 0.22, 0.2]] },
       head: { pts: [[0.24, 0.0, 0.04, 0.04], [0.28, 0.02, 0.2, 0.19], [0.38, 0.02, 0.19, 0.18], [0.48, -0.03, 0.12, 0.1], [0.58, -0.06, 0.08, 0.07], [0.63, -0.07, 0.06, 0.055], [0.65, -0.07, 0.01, 0.01]], eye: [0.45, 0.08, 0.1, 0.016], ear: { at: [0.33, 0.19, 0.13], dir: [-0.2, 0.9, 0.4], len: 0.09, wid: 0.08 } },
@@ -45,7 +45,7 @@
       graze: -0.7,
     },
     boar: {
-      name: 'Javali', hostile: 'territorial', hp: 110, walk: 1.1, run: 8.0, turn: 3.0, radius: 0.5, sight: 30, hearing: 38, points: 200, vital: [0.1, 0.5], dmg: [15, 20], reach: 1.4, cd: 1.4,
+      name: 'Boar', hostile: 'territorial', hp: 110, walk: 1.1, run: 8.0, turn: 3.0, radius: 0.5, sight: 30, hearing: 38, points: 200, vital: [0.1, 0.5], dmg: [15, 20], reach: 1.4, cd: 1.4,
       body: [[-0.62, 0.62, 0.03, 0.03], [-0.58, 0.62, 0.2, 0.18], [-0.45, 0.63, 0.28, 0.24], [-0.2, 0.64, 0.31, 0.26], [0.05, 0.67, 0.34, 0.27], [0.28, 0.72, 0.37, 0.26], [0.42, 0.72, 0.33, 0.23], [0.5, 0.7, 0.24, 0.19], [0.54, 0.68, 0.1, 0.1]],
       neck: { at: [0.45, 0.72], pts: [[0, 0, 0.26, 0.22], [0.1, -0.04, 0.24, 0.2], [0.18, -0.08, 0.22, 0.17]] },
       head: { pts: [[0.16, -0.06, 0.04, 0.04], [0.19, -0.04, 0.2, 0.16], [0.3, -0.08, 0.17, 0.13], [0.42, -0.14, 0.11, 0.09], [0.54, -0.2, 0.075, 0.07], [0.6, -0.22, 0.07, 0.065], [0.61, -0.22, 0.01, 0.01]], eye: [0.31, 0.0, 0.105, 0.012], ear: { at: [0.22, 0.1, 0.1], dir: [-0.3, 0.8, 0.5], len: 0.12, wid: 0.065 } },
@@ -56,7 +56,7 @@
       graze: -0.55, grazes: true, mane: true, tusks: true,
     },
     fox: {
-      name: 'Raposa', hostile: 'prey', hp: 40, walk: 1.2, run: 8.4, turn: 4.0, radius: 0.3, sight: 40, hearing: 50, points: 120, vital: [0.04, 0.28],
+      name: 'Fox', hostile: 'prey', hp: 40, walk: 1.2, run: 8.4, turn: 4.0, radius: 0.3, sight: 40, hearing: 50, points: 120, vital: [0.04, 0.28],
       body: [[-0.32, 0.36, 0.02, 0.02], [-0.29, 0.36, 0.08, 0.07], [-0.2, 0.36, 0.1, 0.085], [0, 0.36, 0.11, 0.09], [0.16, 0.37, 0.12, 0.085], [0.26, 0.38, 0.1, 0.075], [0.3, 0.39, 0.04, 0.04]],
       neck: { at: [0.24, 0.4], pts: [[0, 0, 0.07, 0.06], [0.06, 0.06, 0.06, 0.05], [0.1, 0.1, 0.055, 0.045]] },
       head: { pts: [[0.08, 0.1, 0.02, 0.02], [0.1, 0.11, 0.06, 0.06], [0.15, 0.1, 0.06, 0.055], [0.21, 0.08, 0.035, 0.03], [0.27, 0.06, 0.018, 0.016], [0.29, 0.06, 0.005, 0.005]], eye: [0.17, 0.13, 0.04, 0.009], ear: { at: [0.11, 0.155, 0.035], dir: [-0.15, 0.9, 0.35], len: 0.09, wid: 0.045 } },
@@ -67,7 +67,7 @@
       graze: -0.8,
     },
     rabbit: {
-      name: 'Coelho', hostile: 'prey', hp: 20, walk: 0.9, run: 7.5, turn: 5.0, radius: 0.2, sight: 30, hearing: 45, points: 80, vital: [-0.05, 0.15], hop: true,
+      name: 'Rabbit', hostile: 'prey', hp: 20, walk: 0.9, run: 7.5, turn: 5.0, radius: 0.2, sight: 30, hearing: 45, points: 80, vital: [-0.05, 0.15], hop: true,
       body: [[-0.2, 0.2, 0.02, 0.02], [-0.17, 0.21, 0.11, 0.1], [-0.08, 0.21, 0.13, 0.11], [0.04, 0.2, 0.11, 0.09], [0.12, 0.2, 0.08, 0.07], [0.16, 0.21, 0.03, 0.03]],
       neck: { at: [0.13, 0.24], pts: [[0, 0, 0.05, 0.045], [0.03, 0.03, 0.05, 0.045]] },
       head: { pts: [[0.02, 0.05, 0.02, 0.02], [0.04, 0.06, 0.055, 0.05], [0.09, 0.06, 0.05, 0.045], [0.13, 0.04, 0.03, 0.028], [0.15, 0.035, 0.01, 0.01]], eye: [0.09, 0.08, 0.04, 0.009], ear: { at: [0.05, 0.1, 0.022], dir: [-0.45, 0.88, 0.12], len: 0.13, wid: 0.035 } },
@@ -101,7 +101,7 @@
   }
   const smooth = (a, b, x) => { const t = HZ.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
-  // ------------------------------------------------------------------ construção do corpo
+  // ------------------------------------------------------------------ body construction
   function buildBody(type, sp, rnd) {
     const col = sp.colors, cBack = C(col.back), cSide = C(col.side), cBelly = C(col.belly), cLeg = C(col.leg), cNose = C(col.nose), cMuz = C(col.muzzle);
     const R = HZ.q ? HZ.q.radial + 6 : 14;
@@ -122,7 +122,7 @@
     const mk = (geo, mat, zone, parent) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; m.userData.zone = zone; parent.add(m); meshes.push(m); return m; };
     const fm = furMat(type);
 
-    // corpo (+ crina do javali)
+    // body (+ boar mane)
     let bodyGeo = tube(sp.body, bodyCol, R + 4, { radiusFn: (ph, s01) => 1 + 0.03 * Math.sin(ph * 3 + s01 * 9) });
     if (sp.mane) {
       const mane = sp.body.slice(2, -1).map(b => [b[0], b[1] + b[2] * 0.92, 0.07, 0.025]);
@@ -130,7 +130,7 @@
     }
     const body = mk(bodyGeo, fm, 'body', rig);
 
-    // pescoço e cabeça (pivô permite abaixar para pastar e olhar em volta)
+    // neck and head (pivot allows lowering to graze and looking around)
     const neckPivot = new THREE.Group(); neckPivot.position.set(sp.neck.at[0], sp.neck.at[1], 0); rig.add(neckPivot);
     const neckCol = (c, s, s01, p, nx, ny) => { let cc = coat(p, ny * 0.8 + 0.1); if (type === 'fox' || type === 'wolf') cc = ny < -0.2 ? HZ.mixArr(cc, cMuz, 0.7) : cc; return cc; };
     const neck = mk(tube(sp.neck.pts, neckCol, R), fm, 'neck', neckPivot);
@@ -143,7 +143,7 @@
       return cc;
     };
     const parts = [tube(hp, headCol, R)];
-    // orelhas
+    // ears
     const E = sp.head.ear;
     for (const sd of [-1, 1]) {
       const d = V(E.dir[0], E.dir[1], E.dir[2] * sd).normalize();
@@ -156,7 +156,7 @@
     const head = mk(HZ.merge(parts), fm, 'head', neckPivot);
     const eg = new THREE.SphereGeometry(sp.head.eye[3], 10, 8);
     for (const sd of [-1, 1]) { const e = mk(eg, eyeMat, 'head', neckPivot); e.position.set(sp.head.eye[0], sp.head.eye[1], sp.head.eye[2] * sd); e.castShadow = false; }
-    // chifres (machos de cervo) / presas (javali)
+    // antlers (male deer) / tusks (boar)
     if (type === 'deer' && rnd() < 0.45) {
       const ag = [];
       const ac = (c, s, s01) => HZ.mixArr(C(0x5a4632), C(0xe0d4bc), smooth(0.6, 1, s01));
@@ -177,12 +177,12 @@
       mk(HZ.merge(tg), tuskMat, 'head', neckPivot);
     }
 
-    // cauda
+    // tail
     const tailPivot = new THREE.Group(); tailPivot.position.set(sp.tail.at[0], sp.tail.at[1], 0); rig.add(tailPivot);
     const tip = sp.tail.tip ? C(sp.tail.tip) : null;
     mk(tube(sp.tail.pts, (c, s, s01, p, nx, ny) => { let cc = coat(p, ny); if (type === 'deer' && ny < 0.3) cc = C(col.rump); if (tip && s01 > 0.78) cc = tip; return cc; }, 8), fm, 'body', tailPivot);
 
-    // pernas: quadril -> joelho
+    // legs: hip -> knee
     const legs = [];
     const legCol = (L, isLower) => (c, s, s01, p, nx, ny) => {
       let cc = HZ.mixArr(cLeg, cSide, isLower ? 0 : 0.5 * (1 - s01));
@@ -206,7 +206,7 @@
       mk(loG, fm, 'leg', knee);
       legs.push({ hip, knee, front, sd, rest: L.rest, h: L.rest[0], k: L.rest[1] });
     };
-    // ordem: LH, LF, RH, RF  (sd = -1 esquerda)
+    // order: LH, LF, RH, RF  (sd = -1 left)
     buildLeg(sp.hind, false, -1); buildLeg(sp.front, true, -1); buildLeg(sp.hind, false, 1); buildLeg(sp.front, true, 1);
     return { root, fall, rig, body, neck, head, neckPivot, tailPivot, legs, meshes };
   }
@@ -247,7 +247,7 @@
 
     get pos() { return this.root.position; }
 
-    // -------------------------------------------------- dano
+    // -------------------------------------------------- damage
     takeHit(hit, baseDmg, dir) {
       if (this.dead) return null;
       const part = hit.object, zone = part.userData.zone;
@@ -258,14 +258,14 @@
       if (zone === 'head' || zone === 'neck') vital = true;
       const dmg = baseDmg * mult;
       this.hp -= dmg;
-      // ferida no ponto de impacto (acompanha o corpo)
+      // wound at the impact point (follows the body)
       const n = hit.face ? hit.face.normal.clone() : V(0, 1, 0);
       this.mgr.effects.bodyBlood(part, local, n, 0.05 + Math.random() * 0.04);
       this.mgr.effects.bloodSpray(hit.point, V().copy(dir).multiplyScalar(0.6).add(V(0, 0.3, 0)), vital ? 1.4 : 1);
       this.mgr.effects.groundDecal(hit.point.x + dir.x * 0.8, hit.point.z + dir.z * 0.8, 0.25 + Math.random() * 0.25, 0, 1);
       this.bleed = Math.min(6, this.bleed + dmg * 0.045);
       if (this.hp <= 0) { this.die(dir, zone); return { killed: true, zone, vital, dmg }; }
-      // reação
+      // reaction
       this.stagger = 0.35;
       const a = this.mgr.audio, p = this.pos;
       if (this.type === 'wolf' || this.type === 'fox') a.yelp(p); else if (this.type === 'boar') a.squeal(p); else if (this.type === 'bear') a.roar(p); else if (this.type === 'deer') a.bark(p);
@@ -276,7 +276,7 @@
 
     die(dir, zone) {
       this.dead = true; this.state = 'dead'; this.hp = 0; this.speed = 0; this.bleed = 0;
-      // cai para o lado oposto ao tiro
+      // falls to the side opposite the shot
       const right = _v.set(Math.sin(this.heading), 0, Math.cos(this.heading));
       this.fallSide = dir && dir.x * right.x + dir.z * right.z < 0 ? -1 : 1;
       this.fall.position.z = this.fallSide * this.sp.front.z * 1.1;
@@ -287,7 +287,7 @@
       this.mgr.onKill(this, zone);
     }
 
-    // após tombar: manchas de sangue no lado de cima e poça no chão
+    // after toppling: blood smears on the upper side and a pool on the ground
     bloodyCorpse() {
       const fx = this.mgr.effects, sd = this.fallSide, B = this.sp.body;
       const n = V(0, 0, -sd);
@@ -300,11 +300,11 @@
         const nn = V(0, (y - s[1]) / s[2] * 0.6, -sd).normalize();
         fx.bodyBlood(this.body, p, nn, (0.12 + Math.random() * 0.2) * (this.sp.big ? 1.6 : this.sp.radius < 0.35 ? 0.55 : 1));
       }
-      // pescoço/cabeça sujos
+      // dirty neck/head
       const np = this.sp.neck.pts[1];
       fx.bodyBlood(this.neck, V(np[0], np[1], -sd * np[3] * 0.95), n, 0.07 * (this.sp.big ? 1.5 : 1));
       if (this.deathZone === 'head') { const hp = this.sp.head.pts[3]; fx.bodyBlood(this.head, V(hp[0], hp[1], -sd * hp[3] * 0.9), n, 0.06); }
-      // poça crescendo sob o corpo e perto da cabeça
+      // pool growing under the body and near the head
       const bc = this.body.localToWorld(V((this.sp.vital[0] + this.sp.vital[1]) / 2, this.sp.body[4][1] - this.sp.body[4][2] * 0.3, sd * this.sp.body[4][3] * 1.1));
       const size = (0.7 + Math.random() * 0.5) * this.len;
       fx.groundDecal(bc.x, bc.z, size, size * 0.09, 0.85);
@@ -330,7 +330,7 @@
       else if (d < 100 && this.state !== 'chase' && this.state !== 'attack') { this.state = 'investigate'; this.stateT = 25; this.target = V(p.x, 0, p.z); }
     }
 
-    // -------------------------------------------------- percepção
+    // -------------------------------------------------- perception
     sense(G, d) {
       const sp = this.sp, pl = G.player;
       let canSee = false;
@@ -351,7 +351,7 @@
       return { canSee, canHear, sightR };
     }
 
-    // -------------------------------------------------- IA
+    // -------------------------------------------------- AI
     think(dt, G, d) {
       const sp = this.sp, pl = G.player;
       this.senseT -= dt;
@@ -403,7 +403,7 @@
           if (!this.target || Math.hypot(this.target.x - this.x, this.target.z - this.z) < 3 || this.stateT <= 0) { this.state = 'walk'; this.stateT = 5; this.target = V(this.x + (Math.random() - 0.5) * 30, 0, this.z + (Math.random() - 0.5) * 30); }
           break;
         }
-        case 'rear': { // urso se ergue e ruge antes de atacar
+        case 'rear': { // the bear rears up and roars before attacking
           this.targetSpeed = 0;
           if (this.stateT <= 0) { this.state = 'chase'; this.stateT = 30; }
           break;
@@ -414,7 +414,7 @@
           if (this.type === 'wolf' && d > 7) { const a = Math.atan2(this.z - pl.pos.z, this.x - pl.pos.x) + this.flankAng * Math.min(1, d / 25); const r = Math.min(d * 0.55, 10); tx = pl.pos.x + Math.cos(a) * r; tz = pl.pos.z + Math.sin(a) * r; }
           this.target = V(tx, 0, tz);
           this.targetSpeed = charge ? sp.run * 1.05 : sp.run * (d < 12 ? 0.95 : 1);
-          // lobos: cercam a presa e mordem alternadamente (bate-e-recua)
+          // wolves: circle the prey and bite in turns (hit and back off)
           if (this.type === 'wolf' && d < 7 && (this.attackCd > 0 || this.mgr.attacking() >= 2)) {
             const a = Math.atan2(this.z - pl.pos.z, this.x - pl.pos.x) + (this.flankAng >= 0 ? 0.9 : -0.9);
             this.target = V(pl.pos.x + Math.cos(a) * 4.8, 0, pl.pos.z + Math.sin(a) * 4.8);
@@ -453,7 +453,7 @@
       }
     }
 
-    // -------------------------------------------------- locomoção
+    // -------------------------------------------------- locomotion
     steer(dt, G) {
       if (!this.target) return this.heading;
       let desired = Math.atan2(-(this.target.z - this.z), this.target.x - this.x);
@@ -483,7 +483,7 @@
       const dx = pl.pos.x - this.x, dz = pl.pos.z - this.z, d = Math.hypot(dx, dz);
       this.distToPlayer = d;
       if (this.dead) { this.updateDeath(dt, G); return; }
-      // LOD: animais distantes pensam menos
+      // LOD: distant animals think less
       this.lodAcc = (this.lodAcc || 0) + dt;
       const far = d > 140;
       if (far && this.lodAcc < 0.2) return;
@@ -498,14 +498,14 @@
       this.think(ddt, G, d);
       if (this.stagger > 0) this.stagger -= ddt;
       if (this.overrun > 0) this.overrun -= ddt;
-      // direção
+      // direction
       let desired = this.heading;
       if (this.state === 'attack' || this.state === 'rear' || this.alertLook) desired = Math.atan2(-dz, dx);
       else if (this.target && this.targetSpeed > 0) desired = this.steer(ddt, G);
       const turnRate = this.sp.turn * (this.speed > this.sp.walk * 2 ? 1.3 : 1);
       const diff = HZ.angleDiff(this.heading, desired);
       this.heading += HZ.clamp(diff, -turnRate * ddt, turnRate * ddt);
-      // velocidade (freia para virar)
+      // speed (brakes to turn)
       const tgt = this.targetSpeed * (Math.abs(diff) > 1.4 ? 0.4 : 1) * (this.stagger > 0 ? 0.3 : 1);
       const acc = tgt > this.speed ? 7 : 10;
       this.speed += HZ.clamp(tgt - this.speed, -acc * ddt, acc * ddt);
@@ -517,7 +517,7 @@
         if (moved < this.speed * ddt * 0.3 && (r.blockedX || r.blockedZ)) { this.stuck = (this.stuck || 0) + ddt; if (this.stuck > 0.6) { this.steerT = 0; this.heading += (Math.random() < 0.5 ? 1 : -1) * 1.3; this.stuck = 0; } }
         this.x = p.x; this.z = p.z; this.y = r.ground;
       } else this.y = G.physics.groundAt(this.x, this.z, this.radius * 0.5);
-      // não atravessar o jogador
+      // do not walk through the player
       if (d < this.radius + 0.45 && d > 0.01) { const push = this.radius + 0.45 - d; this.x -= (dx / d) * push; this.z -= (dz / d) * push; }
       this.animate(ddt, G);
     }
@@ -526,11 +526,11 @@
       const sp = this.sp, spd = this.speed / this.scale;
       this.root.position.set(this.x, this.y, this.z);
       this.root.rotation.y = this.heading;
-      // inclinação com o terreno
+      // lean with the terrain
       const L = this.len * 0.45, cx = Math.cos(this.heading), cz = -Math.sin(this.heading);
       const hf = HZ.heightAt(this.x + cx * L, this.z + cz * L), hb = HZ.heightAt(this.x - cx * L, this.z - cz * L);
       this.pitch += (Math.atan2(hf - hb, 2 * L) - this.pitch) * Math.min(1, dt * 6);
-      // marcha
+      // gait
       let gait;
       if (sp.hop && spd > 0.3) gait = GAITS.bound;
       else if (spd < sp.walk * 1.5) gait = GAITS.walk;
@@ -559,7 +559,7 @@
       this.rig.rotation.z = this.pitch + pitchOsc + rear * 0.95;
       const hx = sp.hind.x;
       this.rig.position.set(rear ? hx - hx * Math.cos(rear * 0.95) : 0, bob + (rear ? -hx * Math.sin(rear * 0.95) : 0), 0);
-      // cabeça
+      // head
       let nt = 0, ny = 0;
       if (this.state === 'graze') nt = sp.graze + Math.sin(G.time * 1.3 + this.phase * 20) * 0.05;
       else if (this.state === 'flee' || this.state === 'chase' || this.state === 'charge') nt = this.type === 'deer' ? -0.15 : -0.3;
@@ -570,23 +570,23 @@
       this.neckPivot.rotation.z += (nt - this.neckPivot.rotation.z) * Math.min(1, dt * 4);
       this.neckYaw += (ny - this.neckYaw) * Math.min(1, dt * 5);
       this.neckPivot.rotation.y = this.neckYaw;
-      // cauda
+      // tail
       const tailUp = this.type === 'deer' && this.state === 'flee' ? 0.9 : this.type === 'wolf' && (this.state === 'chase' || this.state === 'attack') ? 0.35 : 0;
       this.tailPivot.rotation.z += (tailUp - this.tailPivot.rotation.z) * Math.min(1, dt * 5);
       this.tailPivot.rotation.x = Math.sin(G.time * (this.type === 'deer' ? 3 : 1.5) + this.phase * 9) * 0.15;
-      // respiração
+      // breathing
       const br = 1 + Math.sin(G.time * (this.speed > 3 ? 7 : 2) + this.phase * 5) * (this.speed > 3 ? 0.02 : 0.008);
       this.body.scale.set(1, br, br);
       if (this.stagger > 0) this.rig.rotation.x = Math.sin(this.stagger * 30) * 0.08;
       else this.rig.rotation.x *= 0.9;
     }
 
-    // -------------------------------------------------- morte: tombar de lado
+    // -------------------------------------------------- death: topple on the side
     updateDeath(dt, G) {
       if (this.settled) return;
       this.root.position.set(this.x, this.y, this.z);
       const target = Math.PI / 2;
-      // pêndulo invertido: acelera ao cair, quica levemente ao tocar o chão
+      // inverted pendulum: accelerates as it falls, bounces slightly on touching the ground
       this.fallW += (4.5 / Math.max(0.5, this.bodyH)) * Math.sin(this.fallA + 0.25) * dt;
       this.fallA += this.fallW * dt;
       if (this.fallA >= target) {
@@ -602,7 +602,7 @@
       this.rig.position.y *= 0.9;
       const k = Math.min(1, dt * 3);
       this.legs.forEach((Lg, i) => { const R = this.relax[i]; Lg.h += (R.h - Lg.h) * k; Lg.k += (R.k - Lg.k) * k; Lg.hip.rotation.z = Lg.h; Lg.knee.rotation.z = Lg.k; Lg.hip.rotation.x = this.fallSide * 0.12 * a * (Lg.sd * this.fallSide > 0 ? -1 : 1); });
-      // cabeça e pescoço pendem até o chão
+      // head and neck hang down to the ground
       this.neckPivot.rotation.z += (-0.25 - this.neckPivot.rotation.z) * k;
       this.neckPivot.rotation.x = this.fallSide * 0.35 * a;
       this.neckPivot.rotation.y *= 0.95;
@@ -619,7 +619,7 @@
     dispose(scene) { scene.remove(this.root); }
   }
 
-  // ------------------------------------------------------------------ gerenciador
+  // ------------------------------------------------------------------ manager
   class AnimalManager {
     constructor(scene, physics, effects, audio) {
       this.scene = scene; this.physics = physics; this.effects = effects; this.audio = audio;
@@ -670,7 +670,7 @@
       const cand = [];
       for (const a of this.list) {
         if (!a.root.visible) continue;
-        // pré-filtro por distância ao raio
+        // pre-filter by distance to the ray
         _v.set(a.x - origin.x, a.y + a.bodyH * 0.8 - origin.y, a.z - origin.z);
         const t = _v.dot(dir); if (t < 0 || t > maxDist + 3) continue;
         const dist2 = _v.lengthSq() - t * t; const R = a.len + 1.2;
@@ -685,7 +685,7 @@
     update(dt, G) {
       this.playerPos.copy(G.player.pos);
       for (const a of this.list) a.update(dt, G);
-      // separação entre animais vivos
+      // separation between live animals
       const L = this.list;
       for (let i = 0; i < L.length; i++) {
         const a = L[i]; if (a.dead) continue;

@@ -24,7 +24,7 @@ button,input{font:inherit} button{color:inherit} canvas{display:block;width:100%
 .setting-row{display:flex;align-items:center;justify-content:space-between;padding:14px 2px;border-bottom:1px solid rgba(255,255,255,.11)}.setting-row strong,.setting-row small{display:block}.setting-row strong{font:600 11px Manrope}.setting-row small{margin-top:3px;font-size:8px;color:#99a695}.switch{display:flex;align-items:center;gap:8px;cursor:pointer}.switch input{position:absolute;opacity:0}.switch span{position:relative;width:36px;height:18px;border:1px solid #667064;border-radius:12px}.switch span:after{content:'';position:absolute;top:3px;left:3px;width:10px;height:10px;border-radius:50%;background:#9ba698;transition:.2s}.switch input:checked+span{border-color:var(--acid)}.switch input:checked+span:after{left:21px;background:var(--acid)}.switch b{font:700 9px Barlow Condensed;letter-spacing:.12em}.volume-row input{width:115px;accent-color:var(--acid)}.mini-ranking{margin-top:10px;border:1px solid rgba(255,255,255,.11);background:rgba(0,0,0,.12)}.mini-ranking summary{display:flex;justify-content:space-between;padding:9px 11px;cursor:pointer;list-style:none;font:700 8px Manrope;letter-spacing:.16em;color:#b8c3b4}.mini-ranking summary::-webkit-details-marker{display:none}.mini-ranking summary b{color:var(--acid)}.mini-ranking ol{max-height:150px;overflow:auto;margin:0;padding:3px 12px 9px 31px;font:600 9px Manrope;color:#d8ded5}.mini-ranking li{padding:4px 0;border-top:1px solid rgba(255,255,255,.07)}.mini-ranking li span{float:right;color:var(--acid);font-family:Barlow Condensed}.mini-ranking .empty-rank{color:#7f8b7d;font-weight:400}.menu-footer{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}.menu-footer div{display:flex;flex-direction:column;gap:8px;align-items:center;color:#9ca79a;font-size:7px;letter-spacing:.13em}.mouse-icon{font-size:18px;color:#d6ddd3}.ethics{position:absolute;bottom:15px;left:30px;margin:0;font-size:7px;letter-spacing:.2em;color:rgba(255,255,255,.45)}
 .pause-screen{background:rgba(3,8,5,.68);backdrop-filter:blur(12px)}.pause-card{width:min(410px,calc(100% - 32px));padding:35px;text-align:center;border:1px solid rgba(255,255,255,.14);background:rgba(8,16,11,.82)}.pause-card .overline{color:var(--acid);font-size:9px;letter-spacing:.28em}.pause-card h2{margin:5px 0;font:700 36px Barlow Condensed}.pause-card>p:not(.overline){font-size:11px;color:#a7b0a5;margin-bottom:25px}.text-button{margin-top:10px;border:0;background:none;color:#b8c2b5;font-size:9px;letter-spacing:.16em;cursor:pointer}.text-button:hover{color:white}.result-card{width:min(520px,calc(100% - 32px))}.result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin:25px 0;background:rgba(255,255,255,.12)}.result-grid div{display:flex;flex-direction:column;gap:5px;padding:18px 8px;background:#0b1510}.result-grid strong{font:700 32px Barlow Condensed;color:var(--acid)}.result-grid span{font-size:8px;letter-spacing:.18em;color:#aab5a8}.ranking-entry{margin:-5px 0 20px;padding:15px;border:1px solid rgba(183,214,75,.28);background:rgba(183,214,75,.05)}.ranking-entry p,.rank-note{margin:0 0 10px!important;font-size:10px!important;color:#c8d0c5!important}.ranking-entry>div{display:flex}.ranking-entry input{min-width:0;flex:1;border:1px solid #4f5f4c;background:#0a120d;color:white;padding:10px 12px;outline:none;text-transform:uppercase;font-size:11px;letter-spacing:.12em}.ranking-entry input:focus{border-color:var(--acid)}.ranking-entry button{border:0;background:var(--acid);color:#10170b;padding:0 16px;font:800 10px Manrope;cursor:pointer}.ranking-entry small{display:block;min-height:13px;margin-top:7px;color:var(--acid);font-size:8px}.loading-screen{background:#07100b}.loader-mark{font:800 72px Barlow Condensed;color:var(--acid);font-style:italic}.loading-screen p{font:600 9px Manrope;letter-spacing:.27em}.loading-bar{width:190px;height:2px;background:#263228}.loading-bar i{display:block;height:100%;width:0;background:var(--acid);transition:width .25s}@keyframes load{from{width:0}to{width:100%}}
 
-/* ======================= HUNTERZ 2 — novos elementos ======================= */
+/* ======================= HUNTERZ 2 — new elements ======================= */
 body{font-family:Manrope,"Segoe UI",system-ui,sans-serif}
 .menu-brand h1,.brand-mini,.status-line strong,.ammo strong,.pause-card h2,.result-grid strong,.loader-mark{font-family:"Barlow Condensed","Arial Narrow","Roboto Condensed",Impact,sans-serif}
 .vignette{background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.08) 75%,rgba(0,0,0,.35) 120%)}
@@ -32,7 +32,7 @@ body{font-family:Manrope,"Segoe UI",system-ui,sans-serif}
 #bloodOverlay{position:absolute;inset:0;z-index:6;pointer-events:none;opacity:0;background-size:cover;background-position:center;mix-blend-mode:multiply;transition:opacity .6s}
 .loading-screen .loading-msg{margin-top:12px;font-size:8px;letter-spacing:.2em;color:#8f9b8c;min-height:12px}.loading-error{max-width:min(360px,calc(100vw - 40px));margin:22px auto 0;padding:16px;border:1px solid rgba(216,65,44,.45);background:rgba(70,12,8,.25);font:500 10px/1.6 Manrope;color:#e8c6bf}.loading-error button{display:block;margin:14px auto 0;padding:10px 14px;border:1px solid rgba(206,227,137,.5);background:#a8c841;color:#10170b;font:800 10px Barlow Condensed;letter-spacing:.12em;cursor:pointer}.loading-error button:hover{filter:brightness(1.1)}
 
-/* vida / estamina */
+/* health / stamina */
 .vitals{position:absolute;left:32px;bottom:180px;width:260px;display:flex;flex-direction:column;gap:7px}
 .vital-row{display:flex;align-items:center;gap:9px}
 .vital-row .ico{width:18px;font:700 12px "Barlow Condensed",sans-serif;color:#e8ece2;text-align:center;text-shadow:0 1px 3px #000}
@@ -48,14 +48,14 @@ body{font-family:Manrope,"Segoe UI",system-ui,sans-serif}
 .bandages b{display:inline-block;padding:2px 7px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.35);color:#fff;font:700 12px "Barlow Condensed",sans-serif}
 .bandages.using b{background:var(--acid);color:#10170b}
 
-/* indicador de direção do dano */
+/* damage direction indicator */
 .dmg-dir{position:absolute;left:50%;top:50%;width:240px;height:240px;margin:-120px 0 0 -120px;pointer-events:none;opacity:0;transition:opacity .6s}
 .dmg-dir:before{content:'';position:absolute;left:50%;top:-6px;width:70px;height:26px;margin-left:-35px;border-radius:50% 50% 0 0/100% 100% 0 0;border-top:5px solid rgba(220,30,20,.9);filter:drop-shadow(0 0 6px rgba(255,0,0,.8))}
 .threat{position:absolute;top:108px;left:50%;transform:translateX(-50%);padding:6px 14px;border:1px solid rgba(230,70,50,.5);background:rgba(60,5,2,.45);color:#ffb3a3;font:700 10px Manrope;letter-spacing:.24em;opacity:0;transition:opacity .4s}
 .threat.show{opacity:1;animation:pulse 1.2s infinite}
 @keyframes pulse{50%{border-color:rgba(255,120,90,.9)}}
 
-/* luneta */
+/* scope */
 #scope{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0}
 #scope.on{opacity:1}
 #scope .mask{position:absolute;left:50%;top:50%;width:150vmax;height:150vmax;transform:translate(-50%,-50%);background:radial-gradient(circle at center,transparent 0,transparent calc(38vmin - 2px),rgba(0,0,0,.85) calc(38vmin + 2px),#000 calc(38vmin + 12px))}
@@ -78,7 +78,7 @@ body{font-family:Manrope,"Segoe UI",system-ui,sans-serif}
 .kill-feed b{color:var(--acid);font-family:"Barlow Condensed",sans-serif;font-size:13px;margin-left:6px}
 @keyframes feed{0%{opacity:0;transform:translateX(20px)}8%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}
 
-/* tela de morte */
+/* death screen */
 .death-screen{background:radial-gradient(circle,rgba(40,0,0,.35),rgba(10,0,0,.88));backdrop-filter:blur(3px);animation:fadein 1.2s}
 .death-card{text-align:center}
 .death-card .overline{color:#e0553f;font-size:10px;letter-spacing:.34em}

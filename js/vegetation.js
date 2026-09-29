@@ -1,5 +1,5 @@
-/* HUNTERZ — geometria procedural de vegetação: pinheiros, abetos, carvalhos, bétulas,
-   árvores mortas, arbustos, mudas, grama, samambaias, flores, cogumelos, gravetos, juncos. */
+/* HUNTERZ — procedural vegetation geometry: pines, firs, oaks, birches,
+   dead trees, bushes, saplings, grass, ferns, flowers, mushrooms, twigs, reeds. */
 (function () {
   'use strict';
   const HZ = window.HZ;
@@ -7,10 +7,10 @@
   const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
   const UP = V(0, 1, 0);
 
-  // ------------------------------------------------------------- cartões
+  // ------------------------------------------------------------- cards
   class Cards {
     constructor() { this.pos = []; this.nor = []; this.uv = []; this.wind = []; this.col = []; this.idx = []; }
-    // anchor: 'bottom' (base no centro inferior), 'center', 'left' (borda esquerda no meio)
+    // anchor: 'bottom' (base at the bottom center), 'center', 'left' (left edge in the middle)
     add(c, right, up, w, h, o = {}) {
       const base = this.pos.length / 3;
       const face = V().crossVectors(right, up).normalize();
@@ -34,7 +34,7 @@
       }
       this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
-    // faixa (strip) ao longo de pontos, largura w, com "lado" (vetor)
+    // strip along points, width w, with a "side" (vector)
     strip(points, sideVecs, widths, o = {}) {
       const base = this.pos.length / 3, n = points.length;
       for (let i = 0; i < n; i++) {
@@ -68,7 +68,7 @@
   const perp = d => { const a = Math.abs(d.y) < 0.9 ? UP : V(1, 0, 0); return V().crossVectors(d, a).normalize(); };
   const woodAttrs = g => HZ.ensureAttrs(g, [['wind', 1, 0], ['color', 3, [1, 1, 1]]]);
 
-  // --------------------------------------------------------------- tronco
+  // --------------------------------------------------------------- trunk
   function trunk(rand, H, r0, o = {}) {
     const segs = o.segs || 12, radial = o.radial || 9;
     const pts = [], secs = [];
@@ -88,7 +88,7 @@
       radiusFn: (ph, s) => 1 + (o.ridges || 0.14) * Math.exp(-s * H * 1.4) * Math.sin(ph * 5 + 1.3) + 0.03 * Math.sin(ph * 3 + s * 20),
       wind: p => Math.pow(Math.max(0, p.y) / H, 2) * (o.sway || 0.03),
     });
-    const at = y => { // ponto do eixo numa altura
+    const at = y => { // axis point at a given height
       const t = Math.pow(HZ.clamp(y / H, 0, 1), 1 / 1.15) * segs; const i = Math.min(segs - 1, Math.floor(t)), f = t - i;
       return V().lerpVectors(pts[i], pts[i + 1], f).setY(y - 0.35);
     };
@@ -114,7 +114,7 @@
     return n.multiplyScalar(1 - faceMix).addScaledVector(face, faceMix * (face.dot(n) >= 0 ? 1 : -1)).normalize();
   };
 
-  // ================================================================ PINHEIRO
+  // ================================================================ PINE
   function pine(rand, q) {
     const H = 15 + rand() * 8, r0 = 0.26 + rand() * 0.12;
     const T = trunk(rand, H, r0, { flare: 0.5, radial: q.radial, top: 0.08, wiggle: 0.16, sway: 0.05, lean: [(rand() - 0.5) * 0.03, (rand() - 0.5) * 0.03] });
@@ -148,7 +148,7 @@
       cluster(br.at(1.02), dir, size * 0.9);
     }
     cluster(T.at(H * 0.99), UP, 1.9 * (H / 19));
-    // galhos mortos no tronco
+    // dead branches on the trunk
     const nd = 5 + ((rand() * 6) | 0);
     for (let i = 0; i < nd; i++) {
       const y = 1.5 + rand() * (cs - 2), az = rand() * 7;
@@ -158,7 +158,7 @@
     return { wood: HZ.merge(wood), leaves: cards.geometry(), height: H, trunkR: r0, crown: 3.2 * (H / 19) + 1, kind: 'pine' };
   }
 
-  // ================================================================ ABETO
+  // ================================================================ FIR
   function spruce(rand, q, Hover) {
     const H = Hover || 11 + rand() * 9, r0 = Hover ? 0.05 + Hover * 0.015 : 0.22 + rand() * 0.12;
     const T = trunk(rand, H, r0, { flare: Hover ? 0.1 : 0.45, radial: Hover ? 5 : q.radial, top: 0.05, wiggle: 0.05, taperPow: 1, sway: 0.04 });
@@ -267,7 +267,7 @@
     return { wood: HZ.merge(wood), leaves: cards.geometry(), height: H, trunkR: r0, crown: R + 1, kind: birch ? 'birch' : 'oak' };
   }
 
-  // ================================================================ ÁRVORE MORTA
+  // ================================================================ DEAD TREE
   function snag(rand, q) {
     const H = 7 + rand() * 7, r0 = 0.25 + rand() * 0.12;
     const T = trunk(rand, H, r0, { flare: 0.5, radial: q.radial, top: 0.55, wiggle: 0.2, sway: 0.01 });
@@ -284,7 +284,7 @@
     return { wood: HZ.merge(wood), leaves: null, height: H, trunkR: r0, crown: 2, kind: 'snag' };
   }
 
-  // ================================================================ ARBUSTO
+  // ================================================================ BUSH
   function bush(rand) {
     const cards = new Cards(), wood = [];
     const R = 0.8 + rand() * 0.6, Hh = 0.7 + rand() * 0.6;
@@ -304,7 +304,7 @@
     return { wood: HZ.merge(wood), leaves: cards.geometry(), height: Hh * 1.2, crown: R };
   }
 
-  // ================================================================ PEQUENOS
+  // ================================================================ SMALL PLANTS
   function grassClump(rand, w = 0.75, h = 0.55) {
     const cards = new Cards();
     for (let k = 0; k < 3; k++) {

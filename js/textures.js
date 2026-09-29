@@ -1,4 +1,4 @@
-/* HUNTERZ — texturas procedurais de alta resolução (sem assets externos). */
+/* HUNTERZ — high-resolution procedural textures (no external assets). */
 (function () {
   'use strict';
   const HZ = window.HZ;
@@ -8,7 +8,7 @@
   const clamp255 = v => (v < 0 ? 0 : v > 255 ? 255 : v);
   const rgb = (r, g, b, a = 1) => `rgba(${r | 0},${g | 0},${b | 0},${a})`;
 
-  // desenha com "wrap" para textura tileável
+  // draws with "wrap" for a tileable texture
   function wrap(ctx, w, h, x, y, r, fn) {
     for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
       const px = x + ox * w, py = y + oy * h;
@@ -17,7 +17,7 @@
     }
   }
 
-  // Canvas de cor + canvas de alfa com os mesmos traços
+  // Color canvas + alpha canvas with the same strokes
   function dual(w, h, bg, seed, draw) {
     const color = canvas(w, h), alpha = canvas(w, h);
     const cc = color.getContext('2d'), ac = alpha.getContext('2d');
@@ -36,14 +36,14 @@
     ctx.closePath(); ctx.restore();
   }
 
-  // ---------------------------------------------------------------- SOLO
+  // ---------------------------------------------------------------- GROUND
   T.build = function (quality) {
-    // Média usa resolução intermediária: reduz o tempo de geração procedural sem
-    // sacrificar nitidez perceptível no jogo. Alta mantém os mapas de 512 px.
-    const S = quality === 'baixa' ? 256 : quality === 'media' ? 384 : 512;
+    // Medium uses an intermediate resolution: it cuts procedural generation time without
+    // sacrificing noticeable sharpness in game. High keeps the 512 px maps.
+    const S = quality === 'low' ? 256 : quality === 'medium' ? 384 : 512;
     const t0 = performance.now();
 
-    // Grama rasteira / musgo
+    // Creeping grass / moss
     {
       const c = pixelCanvas(S, S, (u, v, x, y, o) => {
         const n = fbm(u * 6, v * 6, 4, 11, 6), m = fbm(u * 24, v * 24, 3, 12, 24), d = perlin(u * 3, v * 3, 13, 3);
@@ -63,7 +63,7 @@
       T.grassGround = c;
     }
 
-    // Serrapilheira (folhas secas + acículas + galhos)
+    // Forest litter (dry leaves + needles + twigs)
     {
       const c = pixelCanvas(S, S, (u, v, x, y, o) => {
         const n = fbm(u * 8, v * 8, 4, 31, 8);
@@ -96,7 +96,7 @@
       T.litter = c;
     }
 
-    // Terra / trilha
+    // Dirt / trail
     {
       const c = pixelCanvas(S, S, (u, v, x, y, o) => {
         const n = fbm(u * 5, v * 5, 5, 41, 5), m = fbm(u * 30, v * 30, 2, 42, 30);
@@ -113,7 +113,7 @@
       T.dirt = c;
     }
 
-    // Rocha com fissuras e líquen
+    // Rock with fissures and lichen
     {
       const c = pixelCanvas(S, S, (u, v, x, y, o) => {
         const n = fbm(u * 4, v * 4, 5, 51, 4), cr = ridged(u * 5, v * 5, 4, 52, 5), sp = fbm(u * 18, v * 18, 3, 53, 18);
@@ -126,8 +126,8 @@
       T.rock = c;
     }
 
-    // Cascas de árvore
-    const barkSize = quality === 'baixa' ? [128, 256] : quality === 'media' ? [192, 384] : [256, 512];
+    // Tree barks
+    const barkSize = quality === 'low' ? [128, 256] : quality === 'medium' ? [192, 384] : [256, 512];
     T.barkPine = pixelCanvas(barkSize[0], barkSize[1], (u, v, x, y, o) => {
       const plates = ridged(u * 5, v * 2, 3, 61, 5), n = fbm(u * 12, v * 5, 3, 62, 12), flake = HZ.smooth(0.3, 0.7, fbm(u * 3, v * 3, 2, 63, 3));
       const fiss = Math.pow(plates, 4);
@@ -154,10 +154,10 @@
       o[0] = clamp255(g); o[1] = clamp255(g * 0.98); o[2] = clamp255(g * 0.92);
     });
 
-    // --------------------------------------------------- FOLHAGEM (cor + alfa)
-    const F = quality === 'baixa' ? 256 : quality === 'media' ? 384 : 512, kf = F / 512;
+    // --------------------------------------------------- FOLIAGE (color + alpha)
+    const F = quality === 'low' ? 256 : quality === 'medium' ? 384 : 512, kf = F / 512;
 
-    // Tufo de pinheiro (acículas longas)
+    // Pine tuft (long needles)
     T.pine = dual(F, F, '#34431f', 101, (ctx, r, C) => {
       for (let t = 0; t < 7; t++) {
         const bx = F * (0.3 + r() * 0.4), by = F * (0.72 + r() * 0.2), ang = -Math.PI / 2 + (r() - 0.5) * 1.6, L = F * (0.35 + r() * 0.25);
@@ -176,7 +176,7 @@
       }
     });
 
-    // Ramo de abeto (vista superior, "espinha de peixe")
+    // Fir branch (top view, "fishbone")
     T.spruce = dual(F, F / 2, '#1f3219', 111, (ctx, r, C) => {
       const H = F / 2, cy = H * 0.5;
       ctx.strokeStyle = C(rgb(70, 52, 36)); ctx.lineWidth = 4 * kf;
@@ -199,7 +199,7 @@
           }
         }
       }
-      // acículas ao longo do eixo principal
+      // needles along the main axis
       for (let i = 0; i < 200; i++) {
         const px = r() * F * 0.95, na = (r() - 0.5) * 3, nl = (8 + r() * 8) * kf, g = 40 + r() * 40;
         ctx.strokeStyle = C(rgb(g * 0.5, g, g * 0.5)); ctx.lineWidth = 1.5 * kf;
@@ -207,7 +207,7 @@
       }
     });
 
-    // Cacho de folhas largas (carvalho/faia)
+    // Cluster of broad leaves (oak/beech)
     const leafCluster = (seed, base, spread, leafLen, count) => dual(F, F, rgb(base[0] * 0.8, base[1] * 0.8, base[2] * 0.8), seed, (ctx, r, C) => {
       const cx = F / 2, cy = F / 2;
       ctx.strokeStyle = C(rgb(70, 54, 38)); ctx.lineWidth = 3 * kf;
@@ -236,8 +236,8 @@
     T.birchLeaves = leafCluster(131, [104, 136, 58], 0.32, 30, 520);
     T.bushLeaves = leafCluster(141, [58, 86, 38], 0.34, 34, 480);
 
-    // Tufo de grama (cartão)
-    const G = quality === 'baixa' ? 128 : 256;
+    // Grass tuft (card)
+    const G = quality === 'low' ? 128 : 256;
     T.grass = dual(G, G, '#4b5e2c', 151, (ctx, r, C) => {
       for (let i = 0; i < 46; i++) {
         const bx = G * (0.08 + r() * 0.84), h = G * (0.45 + r() * 0.53), bend = (r() - 0.5) * G * 0.35, w = G * (0.012 + r() * 0.014);
@@ -249,7 +249,7 @@
         ctx.beginPath(); ctx.moveTo(bx - w, G); ctx.quadraticCurveTo(bx - w * 0.5 + bend * 0.3, G - h * 0.55, bx + bend, G - h);
         ctx.quadraticCurveTo(bx + w * 0.5 + bend * 0.3, G - h * 0.55, bx + w, G); ctx.closePath(); ctx.fill();
       }
-      // poucas espigas finas (discretas)
+      // a few thin blades (subtle)
       for (let i = 0; i < 2; i++) {
         const bx = G * (0.25 + r() * 0.5), h = G * (0.78 + r() * 0.18), k = G / 256, ex = bx + (r() - 0.5) * 10 * k;
         ctx.strokeStyle = C(rgb(96, 100, 58)); ctx.lineWidth = 0.9 * k;
@@ -258,7 +258,7 @@
       }
     });
 
-    // Fronde de samambaia
+    // Fern frond
     T.fern = dual(G / 2, G * 2, '#3c5a26', 161, (ctx, r, C) => {
       const W = G / 2, H = G * 2, cx = W / 2;
       ctx.strokeStyle = C(rgb(70, 88, 40)); ctx.lineWidth = 2.2 * (G / 256);
@@ -278,7 +278,7 @@
       }
     });
 
-    // Flores (brancas) — tingidas por instância
+    // Flowers (white) — tinted per instance
     T.flower = dual(128, 128, '#6a7a44', 171, (ctx, r, C) => {
       for (let i = 0; i < 5; i++) {
         const x = 20 + r() * 88, y = 18 + r() * 50;
@@ -288,7 +288,7 @@
       }
     });
 
-    // Pelagem (detalhe em cinza — multiplicado pela cor do vértice)
+    // Fur (grayscale detail — multiplied by the vertex color)
     T.fur = (() => {
       const c = pixelCanvas(256, 256, (u, v, x, y, o) => { const n = fbm(u * 16, v * 4, 3, 181, 16); const g = 200 + n * 30; o[0] = o[1] = o[2] = clamp255(g); });
       const ctx = c.getContext('2d'), r = rng(182);
@@ -300,7 +300,7 @@
       return c;
     })();
 
-    // Sangue (cor + alfa)
+    // Blood (color + alpha)
     T.blood = (() => {
       const size = 256;
       const color = pixelCanvas(size, size, (u, v, x, y, o) => { const n = fbm(u * 6, v * 6, 3, 191); o[0] = clamp255(92 + n * 40); o[1] = clamp255(6 + n * 6); o[2] = clamp255(8 + n * 6); });
@@ -315,15 +315,15 @@
       return { color, alpha };
     })();
 
-    // Sprite suave (poeira, fumaça, gotas)
+    // Soft sprite (dust, smoke, droplets)
     T.soft = (() => { const c = canvas(64), ctx = c.getContext('2d'); const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,.45)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64); return c; })();
     T.smoke = pixelCanvas(128, 128, (u, v, x, y, o) => { const d = Math.hypot(u - 0.5, v - 0.5) * 2; const n = fbm(u * 5, v * 5, 4, 201) * 0.5 + 0.5; const a = HZ.clamp((1 - d) * 1.6 * n, 0, 1); o[0] = o[1] = o[2] = 255; o[3] = a * 255; });
     T.flash = (() => { const c = canvas(128), ctx = c.getContext('2d'); const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,250,220,1)'); g.addColorStop(0.2, 'rgba(255,200,110,.9)'); g.addColorStop(0.5, 'rgba(255,140,40,.35)'); g.addColorStop(1, 'rgba(255,120,20,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128); ctx.globalCompositeOperation = 'lighter'; const r = rng(211); for (let i = 0; i < 9; i++) { const a = r() * 7; ctx.strokeStyle = 'rgba(255,220,150,.6)'; ctx.lineWidth = 3 + r() * 4; ctx.beginPath(); ctx.moveTo(64, 64); ctx.lineTo(64 + Math.cos(a) * 60, 64 + Math.sin(a) * 60); ctx.stroke(); } return c; })();
 
-    // Folha isolada (partículas de folhas caindo)
+    // Single leaf (falling-leaf particles)
     T.leaf = dual(64, 64, '#8a6a30', 221, (ctx, r, C) => { ctx.fillStyle = C(rgb(170, 120, 50)); leafPath(ctx, 6, 32, 52, 14, 0); ctx.fill(); ctx.strokeStyle = C(rgb(110, 70, 30)); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(6, 32); ctx.lineTo(58, 32); ctx.stroke(); });
 
-    // Anéis de tronco cortado
+    // Rings of a cut trunk
     T.rings = pixelCanvas(256, 256, (u, v, x, y, o) => {
       const d = Math.hypot(u - 0.5, v - 0.5) * 2, n = perlin(u * 6, v * 6, 231) * 0.05;
       const ring = 0.5 + 0.5 * Math.sin((d + n) * 90), bark = d > 0.9 ? 1 : 0;
@@ -331,17 +331,17 @@
       o[0] = clamp255(bark ? 70 : g); o[1] = clamp255(bark ? 50 : g * 0.78); o[2] = clamp255(bark ? 36 : g * 0.55);
     });
 
-    // Madeira de nogueira (coronha)
+    // Walnut wood (stock)
     T.walnut = pixelCanvas(256, 512, (u, v, x, y, o) => {
       const w = perlin(u * 3, v * 1, 241) * 2, g = 0.5 + 0.5 * Math.sin((u * 30 + w * 6 + fbm(u * 4, v * 8, 3, 242) * 3));
       const k = 0.7 + g * 0.35;
       o[0] = clamp255(96 * k); o[1] = clamp255(58 * k); o[2] = clamp255(34 * k);
     });
 
-    // Água: normal map animado
+    // Water: animated normal map
     T.waterN = normalFromCanvas(pixelCanvas(256, 256, (u, v, x, y, o) => { const n = fbm(u * 8, v * 8, 4, 251, 8) * 0.5 + 0.5; o[0] = o[1] = o[2] = n * 255; }), 3.5);
 
-    // Normais derivadas
+    // Derived normals
     T.groundN = normalFromCanvas(T.litter, 2.2);
     T.rockN = normalFromCanvas(T.rock, 3.0);
     T.barkPineN = normalFromCanvas(T.barkPine, 3.5);
@@ -354,7 +354,7 @@
     return T;
   };
 
-  // Cria THREE.Textures a partir dos canvases (após o renderer existir)
+  // Creates THREE.Textures from the canvases (once the renderer exists)
   T.toThree = function () {
     const out = {};
     const color = ['grassGround', 'litter', 'dirt', 'rock', 'barkPine', 'barkSpruce', 'barkOak', 'barkBirch', 'fur', 'rings', 'walnut'];
@@ -363,7 +363,7 @@
     lin.forEach(k => (out[k] = tex(T[k], { linear: true })));
     ['pine', 'spruce', 'leaves', 'birchLeaves', 'bushLeaves', 'grass', 'fern', 'flower', 'blood', 'leaf'].forEach(k => {
       out[k] = tex(T[k].color, { clamp: true });
-      // alfa sem mipmap + aniso 1: corta a franja preta nas folhas/grama à distância
+      // alpha without mipmaps + aniso 1: kills the black fringe on leaves/grass at a distance
       out[k + 'A'] = tex(T[k].alpha, { clamp: true, linear: true, noMip: true, aniso: false });
     });
     out.soft = tex(T.soft, { clamp: true });
