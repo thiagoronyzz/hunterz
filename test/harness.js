@@ -42,8 +42,8 @@ function boot(ROOT, SCRIPTS) {
   const elCache = new Map();
   function makeEl(id) {
     const el = {
-      id, className: '', textContent: '', innerHTML: '', value: '75', checked: false, disabled: false,
-      children: [], style: {}, dataset: {}, offsetWidth: 10, innerText: '',
+      id, className: '', textContent: '', value: '75', checked: false, disabled: false,
+      children: [], style: {}, dataset: {}, offsetWidth: 10, innerText: '', parent: null,
       classList: {
         _s: new Set(),
         add(...c) { c.forEach(x => this._s.add(x)); },
@@ -51,10 +51,14 @@ function boot(ROOT, SCRIPTS) {
         toggle(c, f) { if (f === undefined) f = !this._s.has(c); f ? this._s.add(c) : this._s.delete(c); return f; },
         contains(c) { return this._s.has(c); },
       },
-      appendChild(x) { this.children.push(x); return x; },
-      prepend(x) { this.children.unshift(x); },
-      remove() {},
-      removeChild(x) { const i = this.children.indexOf(x); if (i >= 0) this.children.splice(i, 1); },
+      appendChild(x) { x.parent = this; this.children.push(x); return x; },
+      append(...nodes) { nodes.forEach(n => this.appendChild(n)); },   // real DOM has append(); ui code uses it
+      prepend(x) { x.parent = this; this.children.unshift(x); },
+      // honour the one innerHTML use in the code base (clearing a list before redrawing)
+      get innerHTML() { return this._innerHTML; },
+      set innerHTML(v) { this._innerHTML = v; if (v === '') this.children.length = 0; },
+      remove() { const p = this.parent; if (!p) return; const i = p.children.indexOf(this); if (i >= 0) p.children.splice(i, 1); this.parent = null; },
+      removeChild(x) { const i = this.children.indexOf(x); if (i >= 0) this.children.splice(i, 1); x.parent = null; },
       focus() {},
       get lastChild() { return this.children[this.children.length - 1] || null; },
       get firstChild() { return this.children[0] || null; },
@@ -62,6 +66,7 @@ function boot(ROOT, SCRIPTS) {
       removeEventListener() {},
       querySelector: () => null,
     };
+    el._innerHTML = '';
     return el;
   }
   const documentStub = {

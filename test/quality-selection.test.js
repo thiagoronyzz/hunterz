@@ -6,7 +6,7 @@
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const boot = require('./harness.js');
 const ROOT = path.join(__dirname, '..');
-const SCRIPTS = ['js/util.js', 'js/physics.js', 'js/vegetation.js', 'js/world.js', 'js/textures.js', 'js/effects.js', 'js/audio.js', 'js/animals.js', 'js/weapon.js'];
+const SCRIPTS = ['js/util.js', 'js/physics.js', 'js/vegetation.js', 'js/world.js', 'js/textures.js', 'js/effects.js', 'js/audio.js', 'js/animals.js', 'js/weapon.js', 'js/score.js', 'js/missions.js'];
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 const noop = () => {};
 

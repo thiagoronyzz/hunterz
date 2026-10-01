@@ -49,10 +49,16 @@
       </div>
 
       <aside class="status-panel">
+        <div class="status-line"><span>SCORE</span><strong id="scoreValue">0</strong></div>
         <div class="status-line"><span>HUNT TIME</span><strong id="timer">00:00</strong></div>
-        <div class="status-line"><span>ANIMALS REMAINING</span><strong id="animalCount">0</strong></div>
+        <div class="status-line"><span id="remainingLabel">ANIMALS REMAINING</span><strong id="animalCount">0</strong></div>
         <div class="status-line"><span>KILLS CONFIRMED</span><strong id="killCount">0</strong></div>
         <div class="sound-meter" aria-hidden="true"><span>NOISE</span><div><i id="soundLevel"></i></div></div>
+      </aside>
+
+      <aside id="contracts" class="contracts hidden" aria-label="Contracts">
+        <div class="contracts__head"><span>CONTRACTS</span><b id="contractCount">0/3</b></div>
+        <ol id="contractList"></ol>
       </aside>
 
       <aside class="ammo-panel">
@@ -80,8 +86,15 @@
             <label class="switch"><input id="rainToggle" type="checkbox" /><span></span><b>RAIN</b></label>
           </div>
           <div class="setting-row quality-row">
+            <div><strong>Hunt mode</strong><small>Contracts pay by skill, free hunt ends with the last animal</small></div>
+            <select id="modeSelect" class="menu-select" aria-label="Hunt mode">
+              <option value="contracts">CONTRACTS</option>
+              <option value="free">FREE HUNT</option>
+            </select>
+          </div>
+          <div class="setting-row quality-row">
             <div><strong>Graphics quality</strong><small>Changing it reloads the forest</small></div>
-            <select id="qualitySelect" aria-label="Graphics quality">
+            <select id="qualitySelect" class="menu-select" aria-label="Graphics quality">
               <option value="low">LOW</option>
               <option value="medium">MEDIUM</option>
               <option value="high">HIGH</option>
@@ -128,13 +141,15 @@
 
     <section id="endScreen" class="overlay pause-screen hidden" aria-live="polite">
       <div class="pause-card result-card">
-        <p class="overline">ALL ANIMALS DOWN</p>
+        <p class="overline" id="endOverline">ALL ANIMALS DOWN</p>
         <h2>Hunt complete.</h2>
         <div class="result-grid">
           <div><strong id="finalKills">0</strong><span>KILLS</span></div>
           <div><strong id="finalAccuracy">0%</strong><span>ACCURACY</span></div>
           <div><strong id="finalTime">00:00</strong><span>TIME</span></div>
         </div>
+        <ul id="scoreBreakdown" class="score-breakdown"></ul>
+        <p class="final-score">SCORE <strong id="finalScore">0</strong></p>
         <div id="rankingEntry" class="ranking-entry hidden">
           <p>You made the Top 10! Enter your name:</p>
           <div><input id="playerName" type="text" maxlength="16" autocomplete="nickname" placeholder="YOUR NAME" aria-label="Your name on the leaderboard" /><button id="saveRankButton" type="button">SAVE</button></div>
@@ -165,6 +180,8 @@
 
   <script src="js/vendor/three.min.js"></script>
   <script src="js/util.js"></script>
+  <script src="js/score.js"></script>
+  <script src="js/missions.js"></script>
   <script src="js/textures.js"></script>
   <script src="js/physics.js"></script>
   <script src="js/vegetation.js"></script>

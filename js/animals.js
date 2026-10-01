@@ -79,6 +79,9 @@
     },
   };
   HZ.SPECIES = SPECIES;
+  // [type, how many, minimum distance from the spawn point] — exported so tests and
+  // the mission pool can agree on what is actually in the forest
+  HZ.SPAWN_PLAN = [['deer', 12, 30], ['boar', 5, 55], ['fox', 5, 30], ['rabbit', 7, 22], ['wolf', 6, 85], ['bear', 2, 110]];
 
   const C = (hex) => HZ.colorArr(hex);
   const mats = {};
@@ -264,6 +267,8 @@
       this.mgr.effects.bloodSpray(hit.point, V().copy(dir).multiplyScalar(0.6).add(V(0, 0.3, 0)), vital ? 1.4 : 1);
       this.mgr.effects.groundDecal(hit.point.x + dir.x * 0.8, hit.point.z + dir.z * 0.8, 0.25 + Math.random() * 0.25, 0, 1);
       this.bleed = Math.min(6, this.bleed + dmg * 0.045);
+      // remembered so the kill can be scored (zone, vital band and shot distance)
+      this.lastDamage = { zone, vital, dmg, distance: hit.distance || 0 };
       if (this.hp <= 0) { this.die(dir, zone); return { killed: true, zone, vital, dmg }; }
       // reaction
       this.stagger = 0.35;
@@ -284,7 +289,7 @@
       this.fallW = 0.9 + Math.random() * 0.6; this.fallA = 0;
       this.deathZone = zone;
       this.relax = this.legs.map(L => ({ h: (L.front ? 0.35 : -0.45) + (Math.random() - 0.5) * 0.5, k: (L.front ? -0.5 : 0.6) * Math.random() }));
-      this.mgr.onKill(this, zone);
+      this.mgr.onKill(this, zone, this.lastDamage || null);
     }
 
     // after toppling: blood smears on the upper side and a pool on the ground
@@ -493,7 +498,7 @@
         this.hp -= this.bleed * ddt;
         this.dripT -= ddt;
         if (this.dripT <= 0 && Math.hypot(this.x - this.lastDrip.x, this.z - this.lastDrip.z) > 0.9) { this.dripT = 0.25; this.lastDrip.set(this.x, 0, this.z); G.effects.groundDecal(this.x + (Math.random() - 0.5) * 0.3, this.z + (Math.random() - 0.5) * 0.3, 0.1 + Math.random() * 0.12, 0, 0.8); }
-        if (this.hp <= 0) { this.die(null, 'body'); return; }
+        if (this.hp <= 0) { this.lastDamage = null; this.die(null, 'body'); return; } // bled out on its own
       }
       this.think(ddt, G, d);
       if (this.stagger > 0) this.stagger -= ddt;
@@ -630,7 +635,7 @@
       this.list.forEach(a => a.dispose(this.scene));
       this.list = [];
       const rnd = Math.random;
-      const plan = [['deer', 12, 30], ['boar', 5, 55], ['fox', 5, 30], ['rabbit', 7, 22], ['wolf', 6, 85], ['bear', 2, 110]];
+      const plan = HZ.SPAWN_PLAN;
       let pack = 0;
       for (const [type, n, minD] of plan) {
         let packCenter = null;
@@ -660,7 +665,7 @@
     }
     attacking() { let n = 0; for (const a of this.list) if (a.state === 'attack' && !a.dead) n++; return n; }
     alertPack(src) { for (const a of this.list) if (a !== src && a.pack === src.pack && !a.dead && a.pos.distanceTo(src.pos) < 70) a.aggro(true); }
-    onKill(a, zone) { if (this.onKillCb) this.onKillCb(a, zone); }
+    onKill(a, zone, info) { if (this.onKillCb) this.onKillCb(a, zone, info); }
     gunshot(p) { for (const a of this.list) { const d = Math.hypot(a.x - p.x, a.z - p.z); a.hearShot(p, d); } }
     get alive() { return this.list.filter(a => !a.dead); }
     get threats() { return this.list.filter(a => !a.dead && (a.state === 'chase' || a.state === 'attack' || a.state === 'charge' || a.state === 'rear')); }

@@ -8,6 +8,8 @@
   const UI = {
     scene: $('scene'), topbar: $('topbar'), hud: $('hud'), weather: $('weatherChip'), weatherLabel: $('weatherLabel'), mission: $('missionText'),
     animalCount: $('animalCount'), killCount: $('killCount'), timer: $('timer'), ammo: $('ammoCount'), reserve: $('reserveCount'), dots: $('ammoDots'), reloadHint: $('reloadHint'),
+    score: $('scoreValue'), remainingLabel: $('remainingLabel'), contracts: $('contracts'), contractList: $('contractList'), contractCount: $('contractCount'),
+    modeSelect: $('modeSelect'), endOverline: $('endOverline'), scoreBreakdown: $('scoreBreakdown'), finalScore: $('finalScore'),
     crosshair: $('crosshair'), hit: $('hitMarker'), toast: $('toast'), feed: $('killFeed'), hint: $('interactionHint'), hintBottom: $('hintBottom'),
     compL: $('compassLeft'), compM: $('compassMain'), compR: $('compassRight'), sound: $('soundLevel'), threat: $('threat'), dmgDir: $('dmgDir'),
     hpBar: $('hpBar'), hpFill: $('hpFill'), hpLag: $('hpLag'), hpText: $('hpText'), stFill: $('stFill'), bandages: $('bandages'), bandageCount: $('bandageCount'),
@@ -57,6 +59,18 @@
     const nextUrl = new URL(location.href);
     nextUrl.searchParams.set('q', UI.quality.value);
     location.assign(nextUrl.href);
+  });
+
+  // ---------------------------------------------------------------- hunt mode
+  // 'contracts' (default): the hunt ends when the three rolled contracts are done;
+  // 'free': the classic "take down every animal" session.
+  const MKEY = 'hunterz-mode';
+  let huntMode = params.get('mode') || localStorage.getItem(MKEY) || 'contracts';
+  if (huntMode !== 'free' && huntMode !== 'contracts') huntMode = 'contracts';
+  UI.modeSelect.value = huntMode;
+  UI.modeSelect.addEventListener('change', () => {
+    huntMode = UI.modeSelect.value === 'free' ? 'free' : 'contracts';
+    try { localStorage.setItem(MKEY, huntMode); } catch (_) {}
   });
 
   const test = document.createElement('canvas');
@@ -157,7 +171,7 @@
 
   // ---------------------------------------------------------------- state
   const MAG = 5, RESERVE = 45, BASE_DMG = 62;
-  const RKEY = 'hunterz-ranking-v2';
+  const RKEY = 'hunterz-ranking-v3'; // v3: records carry a score, not just a time
   const P = {
     pos: V(SPAWN.x, HZ.heightAt(SPAWN.x, SPAWN.z), SPAWN.z), vel: V(), knock: V(), yaw: 0, pitch: 0, onGround: true, crouch: false, crouchT: 0, sprinting: false,
     hp: 100, hpLag: 100, stamina: 100, alive: true, lastHurt: -99, bandages: 3, bandaging: 0, bleeding: 0, noise: 0, moving: false, bobPhase: 0, moveAmt: 0,
@@ -166,8 +180,11 @@
   const S = {
     mode: 'loading', rain: false, rainAmt: 0, startTime: 0, elapsed: 0, shots: 0, hits: 0, kills: 0, total: 0, ammo: MAG, reserve: RESERVE,
     aim: 0, aimHeld: false, fire: false, lookDX: 0, lookDY: 0, keys: {}, time: 0, flashT: 0, nextLightning: 20, recoilPitch: 0, recoilYaw: 0,
-    lastHeart: 0, huntPressure: false, dmgDirT: 0, hintT: 0,
+    lastHeart: 0, huntPressure: false, dmgDirT: 0, hintT: 0, lastSpottedT: -99,
   };
+  // score + contracts for the current hunt
+  const score = HZ.Score.create();
+  let contracts = new HZ.Missions.Session(HZ.Missions.roll());
 
   // ---------------------------------------------------------------- HUD helpers
   function toast(msg, ms = 2400) { UI.toast.textContent = msg; UI.toast.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => UI.toast.classList.remove('show'), ms); }
@@ -182,8 +199,32 @@
   }
   function updateAnimalUI() {
     const alive = animals.list.filter(a => !a.dead).length;
-    UI.animalCount.textContent = alive; UI.killCount.textContent = S.kills;
-    UI.mission.textContent = S.kills >= S.total ? 'Mission complete' : `Take down the wildlife · ${S.kills}/${S.total}`;
+    UI.killCount.textContent = S.kills;
+    UI.remainingLabel.textContent = huntMode === 'contracts' ? 'CONTRACTS LEFT' : 'ANIMALS REMAINING';
+    UI.animalCount.textContent = huntMode === 'contracts' ? (contracts.total - contracts.completed) : alive;
+    UI.mission.textContent = huntMode === 'contracts'
+      ? (contracts.allDone ? 'All contracts complete' : (contracts.active ? contracts.active.desc : 'Track the wildlife'))
+      : (S.kills >= S.total ? 'Mission complete' : `Take down the wildlife · ${S.kills}/${S.total}`);
+    updateScoreUI(); updateContractsUI();
+  }
+  function updateScoreUI() {
+    UI.score.textContent = score.total;
+    UI.contracts.classList.toggle('hidden', huntMode !== 'contracts');
+  }
+  function updateContractsUI() {
+    if (huntMode !== 'contracts') { UI.contractList.innerHTML = ''; UI.contractCount.textContent = '0/0'; return; }
+    UI.contractCount.textContent = `${contracts.completed}/${contracts.total}`;
+    UI.contractList.innerHTML = '';
+    for (const c of contracts.list) {
+      const li = document.createElement('li');
+      li.className = c.done ? 'done' : (c === contracts.active ? 'active' : '');
+      const title = document.createElement('span');
+      title.textContent = `${c.desc} · ${contracts.progressOf(c)}/${c.need}`;
+      const reward = document.createElement('em');
+      reward.textContent = `${c.title} · +${c.reward}`;
+      li.append(title, reward);
+      UI.contractList.appendChild(li);
+    }
   }
   // blood smear on screen (generated)
   (function makeBlood() {
@@ -200,44 +241,81 @@
   })();
 
   // ---------------------------------------------------------------- ranking
-  function loadRankings() { try { const d = JSON.parse(localStorage.getItem(RKEY) || '[]'); return Array.isArray(d) ? d.filter(x => x && x.name && x.time).slice(0, 10) : []; } catch (_) { return []; } }
+  function loadRankings() { try { const d = JSON.parse(localStorage.getItem(RKEY) || '[]'); return Array.isArray(d) ? d.filter(x => x && x.name && x.score > 0).sort((a, b) => b.score - a.score).slice(0, 10) : []; } catch (_) { return []; } }
   function renderRanking() {
     const r = loadRankings(); UI.startRanking.innerHTML = '';
     if (!r.length) { const li = document.createElement('li'); li.className = 'empty-rank'; li.textContent = 'No records yet'; UI.startRanking.appendChild(li); return; }
-    r.forEach(it => { const li = document.createElement('li'); li.append(document.createTextNode(it.name)); const t = document.createElement('span'); t.textContent = fmt(it.time); li.appendChild(t); UI.startRanking.appendChild(li); });
+    r.forEach(it => {
+      const li = document.createElement('li'); li.append(document.createTextNode(it.name));
+      const s = document.createElement('span'); s.textContent = `${it.score} pts`; s.title = `Time ${fmt(it.time)} · ${it.kills || 0} kills`;
+      li.appendChild(s); UI.startRanking.appendChild(li);
+    });
   }
-  const qualifies = (t) => { const r = loadRankings(); return r.length < 10 || t < r[r.length - 1].time; };
+  // a hunt qualifies by score: a fast, sloppy session no longer beats a clean one
+  const qualifies = (s) => { const r = loadRankings(); return r.length < 10 || s > r[r.length - 1].score; };
   UI.saveRank.addEventListener('click', () => {
     const name = (UI.playerName.value || '').trim().toUpperCase().slice(0, 16) || 'HUNTER';
-    const r = loadRankings(); r.push({ name, time: Math.max(1, Math.round(S.elapsed)), date: Date.now() }); r.sort((a, b) => a.time - b.time);
+    const r = loadRankings();
+    r.push({ name, score: score.total, time: Math.max(1, Math.round(S.elapsed)), kills: S.kills, date: Date.now() });
+    r.sort((a, b) => b.score - a.score);
     try { localStorage.setItem(RKEY, JSON.stringify(r.slice(0, 10))); UI.rankMessage.textContent = 'Record saved to the Top 10!'; UI.saveRank.disabled = true; UI.playerName.disabled = true; renderRanking(); } catch (_) { UI.rankMessage.textContent = 'Could not save in this browser.'; }
   });
   renderRanking();
 
   // ---------------------------------------------------------------- input
   const canvas = renderer.domElement;
-  const lock = () => { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (_) {} };
+  // Some hosts (embedded previews, strict permission policies) refuse the pointer lock.
+  // When that happens the hunter falls back to hold-to-look: drag with the left button to
+  // turn the head, quick tap to shoot, right button still scopes.
+  let lockBlocked = false, drag = null;
+  const look = (dx, dy) => {
+    const sens = 0.0021 * (camera.fov / 72);
+    P.yaw -= dx * sens; P.pitch -= dy * sens;
+    P.pitch = HZ.clamp(P.pitch, -1.48, 1.48);
+    S.lookDX += dx; S.lookDY += dy;
+  };
+  const useFallbackLook = () => {
+    if (lockBlocked) return;
+    lockBlocked = true;
+    if (S.mode === 'playing') toast('Mouse capture is blocked here — drag with the left button to look around.', 5200);
+  };
+  const lock = () => {
+    if (lockBlocked) return;
+    try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(useFallbackLook); } catch (_) { useFallbackLook(); }
+  };
+  document.addEventListener('pointerlockerror', useFallbackLook);
   document.addEventListener('pointerlockchange', () => {
     const locked = document.pointerLockElement === canvas;
-    if (!locked && S.mode === 'playing') pauseGame();
+    if (!locked && S.mode === 'playing' && !lockBlocked) pauseGame();
   });
   document.addEventListener('mousemove', (e) => {
-    if (document.pointerLockElement !== canvas || S.mode !== 'playing' || !P.alive) return;
-    const sens = 0.0021 * (camera.fov / 72);
-    P.yaw -= e.movementX * sens; P.pitch -= e.movementY * sens;
-    P.pitch = HZ.clamp(P.pitch, -1.48, 1.48);
-    S.lookDX += e.movementX; S.lookDY += e.movementY;
+    if (S.mode !== 'playing' || !P.alive) return;
+    if (document.pointerLockElement === canvas) { look(e.movementX, e.movementY); return; }
+    if (lockBlocked && drag) {
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+      look(dx * 1.15, dy * 1.15);
+    }
   });
   canvas.addEventListener('mousedown', (e) => {
     if (S.mode !== 'playing') return;
-    if (document.pointerLockElement !== canvas) { lock(); return; }
-    if (e.button === 0) S.fire = true;
-    if (e.button === 2) { S.aimHeld = true; audio.aim(true); }
+    if (document.pointerLockElement !== canvas && !lockBlocked) { lock(); return; }
+    if (e.button === 2) { S.aimHeld = true; audio.aim(true); return; }
+    if (e.button !== 0) return;
+    if (lockBlocked) drag = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
+    else S.fire = true;
   });
-  window.addEventListener('mouseup', (e) => { if (e.button === 2) { S.aimHeld = false; } });
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 2) { S.aimHeld = false; return; }
+    if (e.button !== 0 || !lockBlocked) return;
+    const d = drag; drag = null;
+    // a short press without dragging is a shot, a drag was just looking around
+    if (d && d.moved < 8 && performance.now() - d.t < 400 && S.mode === 'playing' && P.alive) S.fire = true;
+  });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   window.addEventListener('keydown', (e) => {
     S.keys[e.code] = true;
+    if (e.code === 'Escape' && S.mode === 'playing') { pauseGame(); return; }
     if (S.mode !== 'playing') return;
     if (e.code === 'KeyR') reload();
     if (e.code === 'KeyC' || e.code === 'ControlLeft') { P.crouch = !P.crouch; e.preventDefault(); }
@@ -253,10 +331,12 @@
     P.yaw = 0; P.pitch = 0; P.hp = 100; P.hpLag = 100; P.stamina = 100; P.alive = true; P.bandages = 3; P.bandaging = 0; P.bleeding = 0;
     P.crouch = false; P.deathT = 0; P.hurt = 0; P.shake = 0; P.lastHurt = -99; P.eyeY = P.pos.y + 1.68;
     S.ammo = MAG; S.reserve = RESERVE; S.shots = 0; S.hits = 0; S.kills = 0; S.aim = 0; S.aimHeld = false; S.fire = false;
+    S.lastSpottedT = -99; score.reset();
     rifle.state = 'ready'; post.u.uDead.value = 0; camera.rotation.z = 0;
   }
   function startGame() {
     audio.init(); audio.setVolume(UI.volume.value / 100);
+    contracts = new HZ.Missions.Session(HZ.Missions.roll());
     resetPlayer();
     S.total = animals.list.length;
     S.mode = 'playing'; S.startTime = performance.now(); S.elapsed = 0; S.huntPressure = false;
@@ -273,7 +353,7 @@
     UI.rankingEntry.classList.add('hidden'); UI.notQualified.classList.add('hidden'); UI.rankMessage.textContent = ''; UI.playerName.value = ''; UI.playerName.disabled = false; UI.saveRank.disabled = false;
     startGame();
   }
-  function pauseGame() { if (S.mode !== 'playing') return; S.mode = 'paused'; S.pauseAt = performance.now(); UI.pause.classList.remove('hidden'); S.keys = {}; S.aimHeld = false; }
+  function pauseGame() { if (S.mode !== 'playing') return; S.mode = 'paused'; S.pauseAt = performance.now(); UI.pause.classList.remove('hidden'); S.keys = {}; S.aimHeld = false; document.exitPointerLock && document.exitPointerLock(); }
   function resumeGame() { if (S.mode !== 'paused') return; S.startTime += performance.now() - S.pauseAt; S.mode = 'playing'; UI.pause.classList.add('hidden'); lock(); }
   function setRain(on) { S.rain = on; UI.rain.checked = on; UI.weather.classList.toggle('rain', on); UI.weatherLabel.textContent = on ? 'Heavy rain' : 'Clear sky'; }
   UI.startBtn.addEventListener('click', startGame);
@@ -285,17 +365,38 @@
   UI.rainPause.addEventListener('click', () => setRain(!S.rain));
   UI.volume.addEventListener('input', () => audio.setVolume(UI.volume.value / 100));
 
+  function renderBreakdown() {
+    const b = score.breakdown();
+    UI.finalScore.textContent = b.total;
+    UI.scoreBreakdown.innerHTML = '';
+    const row = (label, value, bad) => {
+      const li = document.createElement('li');
+      if (bad) li.className = 'penalty';
+      const l = document.createElement('span'); l.textContent = label;
+      const v = document.createElement('b'); v.textContent = value;
+      li.append(l, v); UI.scoreBreakdown.appendChild(li);
+    };
+    row('Kill points', b.killPoints);
+    row('Contract points', b.objectivePoints);
+    row('Vital hits', `${score.vitalKills}/${b.kills}`);
+    row('Accuracy', `${b.hits}/${b.shots} shots · ${Math.round(b.accuracy * 100)}%`);
+    row('Accuracy factor', '×' + b.accuracyMult.toFixed(2), b.accuracyMult < 1);
+    row('Vital factor', '×' + b.vitalsMult.toFixed(2), b.vitalsMult < 1);
+  }
   function finishSession() {
     if (S.mode !== 'playing') return;
     S.mode = 'ended'; document.exitPointerLock && document.exitPointerLock();
     const acc = S.shots ? Math.round((S.hits / S.shots) * 100) : 0;
+    UI.endOverline.textContent = huntMode === 'contracts' ? 'ALL CONTRACTS COMPLETE' : 'ALL ANIMALS DOWN';
     UI.finalKills.textContent = S.kills; UI.finalAccuracy.textContent = acc + '%'; UI.finalTime.textContent = fmt(S.elapsed);
-    const ok = qualifies(S.elapsed); UI.rankingEntry.classList.toggle('hidden', !ok); UI.notQualified.classList.toggle('hidden', ok);
+    renderBreakdown();
+    const total = score.total;
+    const ok = qualifies(total); UI.rankingEntry.classList.toggle('hidden', !ok); UI.notQualified.classList.toggle('hidden', ok);
     UI.end.classList.remove('hidden'); UI.hud.classList.add('hidden');
   }
 
   // ---------------------------------------------------------------- player damage
-  function damagePlayer(dmg, src, knock) {
+  function damagePlayer(dmg, src, knock, cause) {
     if (!P.alive || S.mode !== 'playing') return;
     P.hp -= dmg; P.lastHurt = S.time; P.hurt = Math.min(1, P.hurt + dmg / 30 + 0.35); P.shake = Math.min(1, P.shake + dmg / 25);
     if (dmg > 22) P.bleeding = Math.min(14, P.bleeding + 7);
@@ -309,13 +410,14 @@
       UI.dmgDir.style.transform = `rotate(${ang}rad)`; UI.dmgDir.style.opacity = 1; S.dmgDirT = 1.4;
       S.recoilPitch += 0.04; S.recoilYaw += (Math.random() - 0.5) * 0.08;
     }
-    if (P.hp <= 0) killPlayer(src);
+    if (P.hp <= 0) killPlayer(src, cause);
   }
-  function killPlayer(src) {
+  function killPlayer(src, cause) {
     P.hp = 0; P.alive = false; P.deathT = 0; P.killer = src;
     S.aimHeld = false; S.aim = 0;
     const names = { wolf: 'A WOLF', bear: 'A BEAR', boar: 'A BOAR' };
-    UI.deathCause.textContent = src ? `ATTACKED BY ${names[src.type] || 'AN ANIMAL'}` : 'YOU BLED OUT';
+    UI.deathCause.textContent = cause === 'fall' ? 'KILLED BY THE FALL'
+      : src ? `ATTACKED BY ${names[src.type] || 'AN ANIMAL'}` : 'YOU BLED OUT';
     audio.heartbeat(1.5);
   }
 
@@ -339,7 +441,7 @@
     if (!P.alive || P.bandaging > 0) return;
     if (rifle.state !== 'ready') return;
     if (S.ammo <= 0) { audio.dry(); hintBottom(S.reserve > 0 ? 'OUT OF AMMO · PRESS R' : 'OUT OF AMMO'); return; }
-    S.ammo--; S.shots++;
+    S.ammo--; S.shots++; score.shotFired();
     P.sprintLock = 0.35;
     rifle.fire(); audio.gunshot();
     camera.updateMatrixWorld();
@@ -363,7 +465,7 @@
       const an = ha.object.userData.animal;
       const res = an.takeHit(ha, BASE_DMG * (0.92 + Math.random() * 0.16), _d);
       if (res) {
-        S.hits++;
+        S.hits++; score.shotHit();
         const dist = Math.round(ha.distance);
         setTimeout(() => audio.impact('flesh', ha.point), Math.min(900, ha.distance / 0.34));
         hitMarker(res.killed);
@@ -376,15 +478,27 @@
       setTimeout(() => audio.impact(hw.kind, hw.point), Math.min(900, hw.t / 0.34));
     }
     updateAmmoUI();
+    updateScoreUI(); // the accuracy factor moves with every shot
     if (S.ammo === 0 && S.reserve > 0) setTimeout(() => { if (S.ammo === 0) hintBottom('PRESS R TO RELOAD', 2.5); }, 900);
   }
-  animals.onKillCb = (a, zone) => {
+  animals.onKillCb = (a, zone, info) => {
     S.kills++;
-    const zn = { head: 'head shot', neck: 'neck shot', body: 'body shot', leg: 'leg shot' }[zone] || 'bleed out';
-    const bonus = zone === 'head' ? 2 : zone === 'neck' ? 1.5 : 1;
-    feed(`${a.sp.name} down · ${zn} <b>+${Math.round(a.sp.points * bonus)}</b>`);
+    // a kill counts as stealthy when the animal never noticed the hunter
+    const evt = {
+      type: a.type, zone, vital: !!(info && info.vital), distance: info ? info.distance : 0,
+      bledOut: !info, stealth: S.time - S.lastSpottedT > 4,
+      crouch: P.crouch, sprint: P.sprinting, time: S.elapsed,
+    };
+    const { points, label } = score.addKill(a.sp, evt);
+    feed(`${a.sp.name} down · ${label} <b>+${points} pts</b>`);
+    const finished = huntMode === 'contracts' ? contracts.onKill(evt) : [];
+    for (const c of finished) {
+      score.addObjective(c.reward);
+      toast(`CONTRACT COMPLETE · ${c.title} · +${c.reward}`, 3200);
+      feed(`<b>${c.title}</b> complete +${c.reward}`);
+    }
     updateAnimalUI();
-    if (S.kills >= S.total) setTimeout(finishSession, 1500);
+    if (huntMode === 'contracts' ? contracts.allDone : S.kills >= S.total) setTimeout(finishSession, 1500);
   };
 
   // ---------------------------------------------------------------- player
@@ -428,7 +542,7 @@
     const g = res.ground;
     const ny = P.pos.y + P.vel.y * dt;
     if (ny <= g) {
-      if (!P.onGround && P.vel.y < -3) { audio.land(-P.vel.y); if (P.vel.y < -11) damagePlayer((-P.vel.y - 11) * 6, null, 0); P.shake = Math.min(1, P.shake + 0.2); }
+      if (!P.onGround && P.vel.y < -3) { audio.land(-P.vel.y); if (P.vel.y < -11) damagePlayer((-P.vel.y - 11) * 6, null, 0, 'fall'); P.shake = Math.min(1, P.shake + 0.2); }
       P.pos.y = g; P.vel.y = 0; P.onGround = true;
     } else if (P.onGround && P.vel.y <= 0 && P.pos.y - g < 0.55) { P.pos.y = g; P.vel.y = 0; }
     else { P.pos.y = ny; P.onGround = false; }
@@ -625,7 +739,9 @@
       if (S.fire) { S.fire = false; if (P.sprinting) P.sprinting = false; shoot(); }
       updateCamera(dt);
       if (!P.alive && P.deathT > 2.2 && UI.death.classList.contains('hidden')) {
-        UI.deathStats.textContent = `Kills: ${S.kills}/${S.total} · Time: ${fmt(S.elapsed)}`;
+        UI.deathStats.textContent = huntMode === 'contracts'
+          ? `Contracts: ${contracts.completed}/${contracts.total} · Kills: ${S.kills} · Score: ${score.total} · Time: ${fmt(S.elapsed)}`
+          : `Kills: ${S.kills}/${S.total} · Score: ${score.total} · Time: ${fmt(S.elapsed)}`;
         UI.death.classList.remove('hidden'); UI.hud.classList.add('hidden');
         document.exitPointerLock && document.exitPointerLock();
         S.mode = 'dead';
@@ -639,6 +755,8 @@
     G.player.crouch = P.crouch; G.player.moving = P.moving; G.player.noise = P.noise; G.player.alive = P.alive && S.mode === 'playing';
     G.rain = S.rain; G.time = t; G.huntPressure = S.huntPressure;
     if (dt > 0) animals.update(dt, G);
+    // "spotted" bookkeeping: the last time an animal within range had eyes on the hunter
+    if (dt > 0 && P.alive) for (const a of animals.list) { if (!a.dead && a.seen && a.distToPlayer < 90) { S.lastSpottedT = S.time; break; } }
 
     // world and effects
     updateWeather(dt);
@@ -687,7 +805,12 @@
   const stepFrames = (n = 1, dt = 1 / 30, render = true) => { S.noRender = !render; for (let i = 0; i < n; i++) { fakeNow += dt * 1000; frame(fakeNow); } S.noRender = false; return true; };
 
   // test/preview modes via URL (?preview=animals|play)
-  HZ.game = { stepFrames, P, S, animals, world, camera, startGame, damagePlayer, shoot, effects, rifle, scene, renderer, setRain };
+  HZ.game = {
+    stepFrames, P, S, animals, world, camera, startGame, damagePlayer, shoot, effects, rifle, scene, renderer, setRain, score, updateAnimalUI,
+    get contracts() { return contracts; },
+    get huntMode() { return huntMode; },
+    setHuntMode(m) { huntMode = m === 'free' ? 'free' : 'contracts'; UI.modeSelect.value = huntMode; updateAnimalUI(); },
+  };
   if (params.get('rain') === '1') setRain(true);
   } catch (error) {
     showLoadError(error);

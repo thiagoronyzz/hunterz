@@ -87,8 +87,28 @@ body{font-family:Manrope,"Segoe UI",system-ui,sans-serif}
 .death-card .primary-button{width:auto;min-width:260px;background:linear-gradient(100deg,#b8342a,#dd5a3f);border-color:rgba(255,160,130,.5);color:#fff}
 @keyframes fadein{from{opacity:0}}
 
-.quality-row select{background:#0a120d;color:#e9eadf;border:1px solid #4f5f4c;padding:6px 8px;font:600 10px Manrope;letter-spacing:.08em;outline:none;cursor:pointer}
-.quality-row select:focus{border-color:var(--acid)}
+.quality-row select,.menu-select{background:#0a120d;color:#e9eadf;border:1px solid #4f5f4c;padding:6px 8px;font:600 10px Manrope;letter-spacing:.08em;outline:none;cursor:pointer}
+.quality-row select:focus,.menu-select:focus{border-color:var(--acid)}
+
+/* contracts + score */
+.contracts{position:absolute;top:96px;left:32px;width:252px;padding:11px 13px;border:1px solid rgba(255,255,255,.13);background:linear-gradient(135deg,rgba(5,12,7,.7),rgba(5,12,7,.24));backdrop-filter:blur(8px)}
+.contracts__head{display:flex;justify-content:space-between;align-items:center;font:700 8px Manrope;letter-spacing:.2em;color:#b8c3b4}
+.contracts__head b{font:700 13px "Barlow Condensed",sans-serif;color:var(--acid);letter-spacing:.06em}
+.contracts ol{margin:7px 0 0;padding:0;list-style:none}
+.contracts li{position:relative;padding:5px 0 5px 15px;border-top:1px solid rgba(255,255,255,.07);font:600 9px/1.35 Manrope;letter-spacing:.05em;color:#d7ddd3}
+.contracts li:before{content:'';position:absolute;left:1px;top:9px;width:5px;height:5px;border:1px solid rgba(255,255,255,.5);border-radius:50%}
+.contracts li em{display:block;font-style:normal;font-size:8px;letter-spacing:.16em;color:#909c8f}
+.contracts li.done{color:#8d998a;text-decoration:line-through}
+.contracts li.done:before{background:var(--acid);border-color:var(--acid)}
+.contracts li.active{color:#fff}
+.contracts li.active:before{border-color:var(--acid);box-shadow:0 0 7px rgba(183,214,75,.7)}
+.score-breakdown{margin:0 0 18px;padding:0;list-style:none;text-align:left}
+.score-breakdown li{display:flex;justify-content:space-between;padding:5px 2px;border-bottom:1px solid rgba(255,255,255,.08);font:600 10px Manrope;letter-spacing:.08em;color:#b9c3b7}
+.score-breakdown li b{font:700 13px "Barlow Condensed",sans-serif;color:#e9eadf;letter-spacing:.04em}
+.score-breakdown li.penalty b{color:#e0553f}
+.final-score{margin:0 0 20px!important;font:700 11px Manrope!important;letter-spacing:.3em!important;color:#aab5a8!important}
+.final-score strong{display:block;margin-top:4px;font:800 58px/1 "Barlow Condensed",sans-serif;letter-spacing:-.02em;color:var(--acid);text-shadow:0 6px 30px rgba(183,214,75,.25)}
+@media (max-width:900px){.contracts{width:200px;top:88px;left:16px}}
 .menu-footer{grid-template-columns:repeat(4,1fr)}
 .controls-reminder{font-size:8px}
 .hint-bottom{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);font:600 10px Manrope;letter-spacing:.14em;color:#fff;text-shadow:0 2px 6px #000;opacity:0;transition:opacity .3s}
