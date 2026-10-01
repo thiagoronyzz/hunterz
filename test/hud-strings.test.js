@@ -3,7 +3,7 @@
 const fs = require('fs'), vm = require('vm');
 const boot = require('./harness.js');
 const ROOT = require('path').join(__dirname, '..');
-const SCRIPTS = ['js/util.js','js/physics.js','js/vegetation.js','js/world.js','js/textures.js','js/effects.js','js/audio.js','js/animals.js','js/weapon.js'];
+const SCRIPTS = ['js/util.js','js/physics.js','js/vegetation.js','js/world.js','js/textures.js','js/effects.js','js/audio.js','js/animals.js','js/weapon.js','js/score.js','js/missions.js'];
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 const h = boot(ROOT, SCRIPTS);
@@ -58,7 +58,11 @@ const check = (name, got, pred) => {
   G.startGame();
   G.setRain(false);
   check('toast on start', el.get('toast').textContent, v => /Careful: wolves, bears and boars can attack\. Good hunting\./.test(v) && isEn(v));
-  check('mission text', el.get('missionText').textContent, v => /Take down the wildlife · 0\/\d+/.test(v));
+  check('mission text (contracts)', el.get('missionText').textContent, v => v === G.contracts.active.desc && !/[à-ÿ]/.test(v));
+  check('contracts rolled for the hunt', G.contracts.list.length, v => v === 3);
+  check('contract list rendered', el.get('contractList').children.length, v => v === 3);
+  check('contract counter', String(el.get('contractCount').textContent), v => v === '0/3');
+  check('score line starts at zero', String(el.get('scoreValue').textContent), v => v === '0');
   check('reload hint', el.get('reloadHint').textContent, v => v === 'R TO RELOAD');
   check('weather label (clear)', el.get('weatherLabel').textContent, v => v === 'Clear sky');
 
@@ -85,10 +89,13 @@ const check = (name, got, pred) => {
   check('bandage done toast', el.get('toast').textContent, v => v === 'Wounds bandaged · +40 health');
 
   // kill feed: use the real onKillCb via the animals manager hook
-  const an = { sp: { name: 'Deer', points: 150 } };
-  G.animals.onKillCb(an, 'head');
-  check('kill feed entry', el.get('killFeed').children[0] && el.get('killFeed').children[0].innerHTML, v => v === 'Deer down · head shot <b>+300</b>');
+  // (spotted -> no stealth bonus; 60 m -> distance factor 1.0, so 150 x2 = 300)
+  G.S.lastSpottedT = G.S.time;
+  const an = { sp: { name: 'Deer', points: 150 }, type: 'deer' };
+  G.animals.onKillCb(an, 'head', { zone: 'head', vital: true, distance: 60 });
+  check('kill feed entry', el.get('killFeed').children[0] && el.get('killFeed').children[0].innerHTML, v => v === 'Deer down · head shot <b>+300 pts</b>');
   check('mission after kill', el.get('missionText').textContent, v => isEn(v));
+  check('score after kill', Number(el.get('scoreValue').textContent) > 0, v => v === true);
 
   // player death by predator
   G.damagePlayer(999, { x: 5, z: 5, type: 'wolf' }, 0);
@@ -102,7 +109,11 @@ const check = (name, got, pred) => {
   check('death cause (bear)', el.get('deathCause').textContent, v => v === 'ATTACKED BY A BEAR');
   G.S.mode = 'playing';
   G.stepFrames(90, 1 / 30, false);
-  check('death stats', el.get('deathStats').textContent, v => /^Kills: \d+\/\d+ · Time: \d\d:\d\d$/.test(v));
+  check('death stats', el.get('deathStats').textContent, v => /^Contracts: \d+\/3 · Kills: \d+ · Score: \d+ · Time: \d\d:\d\d$/.test(v));
+  G.setHuntMode('free'); G.S.kills = 0; G.updateAnimalUI();
+  check('free-hunt mission text', el.get('missionText').textContent, v => /Take down the wildlife · 0\/\d+/.test(v));
+  check('free-hunt remaining label', el.get('remainingLabel').textContent, v => v === 'ANIMALS REMAINING');
+  G.setHuntMode('contracts');
   check('death screen shown', el.get('deathScreen').classList.contains('hidden'), v => v === false);
 
   // hit zone labels via the real shoot path
