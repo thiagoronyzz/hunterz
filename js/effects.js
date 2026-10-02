@@ -386,9 +386,45 @@
       s += texture2D(tDiffuse, vUv + uDir * 1.385).rgb * 0.316; s += texture2D(tDiffuse, vUv - uDir * 1.385).rgb * 0.316;
       s += texture2D(tDiffuse, vUv + uDir * 3.231).rgb * 0.07; s += texture2D(tDiffuse, vUv - uDir * 3.231).rgb * 0.07;
       gl_FragColor = vec4(s, 1.0); }`;
+  // Screen-space ambient occlusion from the scene depth: soft contact shadows under
+  // trees, animals and rocks — the single biggest cue that sells the scene as real.
+  const AO_FS = `
+    uniform sampler2D tDepth; uniform mat4 uProjInv; uniform vec2 uRes;
+    uniform float uProjScale; uniform float uRadius; uniform float uRot;
+    varying vec2 vUv;
+    vec3 vpos(vec2 uv){
+      float d = texture2D(tDepth, uv).x;
+      vec4 p = uProjInv * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+      return p.xyz / p.w;
+    }
+    float hash21(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main(){
+      float d = texture2D(tDepth, vUv).x;
+      if (d >= 0.99995) { gl_FragColor = vec4(1.0); return; }
+      vec3 P = vpos(vUv);
+      vec3 N = normalize(cross(dFdx(P), dFdy(P)));
+      if (N.z < 0.0) N = -N;
+      float rpx = min(uProjScale * uRadius / max(0.25, -P.z), 0.22);
+      float jitter = hash21(gl_FragCoord.xy + vec2(uRot));
+      float occ = 0.0;
+      for (int i = 0; i < 12; i++){
+        float fi = (float(i) + jitter) / 12.0;
+        float ang = fi * 20.0 + uRot;
+        vec2 off = vec2(cos(ang), sin(ang)) * (rpx * (0.25 + 0.75 * fi));
+        off.x *= uRes.y / uRes.x;
+        vec3 Sp = vpos(vUv + off);
+        vec3 vv = Sp - P;
+        float dist = length(vv);
+        occ += max(0.0, dot(N, vv / max(dist, 1e-4)) - 0.02) / (1.0 + dist * dist * 0.8);
+      }
+      float ao = 1.0 - clamp(occ / 12.0 * 2.6, 0.0, 1.0) * 0.82;
+      gl_FragColor = vec4(vec3(ao), 1.0);
+    }`;
+
   const FINAL_FS = `
     uniform sampler2D tScene; uniform sampler2D tBloom; uniform float uBloom; uniform float uExposure; uniform float uTime; uniform vec2 uRes;
     uniform float uDamage; uniform float uLow; uniform float uSat; uniform float uDead; uniform float uWet;
+    uniform sampler2D tAO; uniform float uAO; uniform vec2 uAOTexel;
     varying vec2 vUv;
     vec3 RRTAndODTFit(vec3 v){ vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
     vec3 aces(vec3 c){
@@ -401,22 +437,27 @@
       vec2 dc = vUv - 0.5; float r2 = dot(dc, dc);
       vec2 off = dc * r2 * 0.0035;
       vec3 col = vec3(texture2D(tScene, vUv - off).r, texture2D(tScene, vUv).g, texture2D(tScene, vUv + off).b);
-      col += texture2D(tBloom, vUv).rgb * uBloom;
-      col *= uExposure / 0.6;
-      col = aces(col);
+    col += texture2D(tBloom, vUv).rgb * uBloom;
+    col *= uExposure / 0.6;
+    // ambient occlusion (4-tap soften of the half-res AO buffer), in linear space
+    float ao = (texture2D(tAO, vUv).r * 4.0
+      + texture2D(tAO, vUv + vec2(uAOTexel.x, 0.0)).r + texture2D(tAO, vUv - vec2(uAOTexel.x, 0.0)).r
+      + texture2D(tAO, vUv + vec2(0.0, uAOTexel.y)).r + texture2D(tAO, vUv - vec2(0.0, uAOTexel.y)).r) / 8.0;
+    col *= mix(1.0, ao, uAO);
+    col = aces(col);
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(vec3(l), col, uSat * (1.0 - uLow * 0.55) * (1.0 - uDead));
       // light cinematic color curve (cool shadows, warm highlights)
       col = mix(col, col * vec3(0.94, 1.0, 1.04), (1.0 - l) * 0.35);
       col = mix(col, col * vec3(1.05, 1.0, 0.93), l * 0.3);
       col = mix(col, col * col * (3.0 - 2.0 * col), 0.18);
-      float vig = smoothstep(0.35, 1.05, length(dc) * 1.35);
-      col *= 1.0 - vig * (0.42 + uLow * 0.25);
+    float vig = smoothstep(0.42, 1.12, length(dc) * 1.35);
+    col *= 1.0 - vig * (0.34 + uLow * 0.22);
       float edge = smoothstep(0.15, 0.85, length(dc) * 1.4);
       col = mix(col, vec3(0.32, 0.0, 0.0), clamp(uDamage * edge * 1.1 + uDead * 0.55, 0.0, 0.95));
-      col = toSRGB(col);
-      col += (hash(vUv * uRes + fract(uTime) * 91.7) - 0.5) * 0.028;
-      gl_FragColor = vec4(col, 1.0);
+    col = toSRGB(col);
+    col += (hash(vUv * uRes + fract(uTime) * 91.7) - 0.5) * 0.018;
+    gl_FragColor = vec4(col, 1.0);
     }`;
 
   class Post {
@@ -425,6 +466,8 @@
       // samples only if the GPU has MSAA on FBO; 0 avoids a huge allocation and black artifacts
       const samples = Math.max(0, q.samples | 0);
       const opt = { type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: false, samples };
+      this.aoOn = !!q.ao;
+      if (this.aoOn) opt.depthTexture = new THREE.DepthTexture(4, 4);
       this.rt = new THREE.WebGLRenderTarget(4, 4, opt);
       this.rt.texture.generateMipmaps = false;
       this.rt.texture.minFilter = THREE.LinearFilter;
@@ -437,16 +480,33 @@
       this.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
       this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); this.quad.frustumCulled = false;
       this.qs = new THREE.Scene(); this.qs.add(this.quad);
-      this.bright = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uTh: { value: 1.15 } }, vertexShader: QUAD_VS, fragmentShader: BRIGHT_FS, depthTest: false, depthWrite: false });
+      this.bright = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uTh: { value: 1.05 } }, vertexShader: QUAD_VS, fragmentShader: BRIGHT_FS, depthTest: false, depthWrite: false });
       this.blur = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uDir: { value: new THREE.Vector2() } }, vertexShader: QUAD_VS, fragmentShader: BLUR_FS, depthTest: false, depthWrite: false });
-      this.final = new THREE.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, uBloom: { value: q.bloom ? 0.28 : 0 }, uExposure: { value: 0.62 }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2() }, uDamage: { value: 0 }, uLow: { value: 0 }, uSat: { value: 1.08 }, uDead: { value: 0 }, uWet: { value: 0 } }, vertexShader: QUAD_VS, fragmentShader: FINAL_FS, depthTest: false, depthWrite: false });
+      this.final = new THREE.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, uBloom: { value: q.bloom ? 0.34 : 0 }, uExposure: { value: 0.68 }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2() }, uDamage: { value: 0 }, uLow: { value: 0 }, uSat: { value: 1.04 }, uDead: { value: 0 }, uWet: { value: 0 }, tAO: { value: null }, uAO: { value: 0 }, uAOTexel: { value: new THREE.Vector2(1, 1) } }, vertexShader: QUAD_VS, fragmentShader: FINAL_FS, depthTest: false, depthWrite: false });
       this.u = this.final.uniforms;
       this._black = new THREE.Texture();
-      // 1x1 black texture for when bloom is off (avoids sampling an empty RT = splotches)
+      // 1x1 black/white textures for the passes that are off (avoid sampling empty RTs)
       const c = document.createElement('canvas'); c.width = c.height = 1;
       const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 1, 1);
       this._black = new THREE.CanvasTexture(c);
       this._black.needsUpdate = true;
+      const cw = document.createElement('canvas'); cw.width = cw.height = 1;
+      const gw = cw.getContext('2d'); gw.fillStyle = '#fff'; gw.fillRect(0, 0, 1, 1);
+      this._white = new THREE.CanvasTexture(cw);
+      this._white.needsUpdate = true;
+      this.u.tAO.value = this._white;
+      // half-resolution AO: cheap, and the bilinear upscale doubles as a blur
+      if (this.aoOn) {
+        this.aoRT = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, stencilBuffer: false });
+        this.aoRT.texture.generateMipmaps = false;
+        this.aoRT.texture.minFilter = THREE.LinearFilter;
+        this.aoRT.texture.magFilter = THREE.LinearFilter;
+        this.aoMat = new THREE.ShaderMaterial({
+          uniforms: { tDepth: { value: this.rt.depthTexture }, uProjInv: { value: new THREE.Matrix4() }, uRes: { value: new THREE.Vector2(2, 2) }, uProjScale: { value: 0.7 }, uRadius: { value: 1.1 }, uRot: { value: 0 } },
+          vertexShader: QUAD_VS, fragmentShader: AO_FS, depthTest: false, depthWrite: false,
+        });
+        this.u.uAO.value = 0.85;
+      }
     }
     setSize(w, h) {
       const W = Math.max(1, w | 0), H = Math.max(1, h | 0);
@@ -454,6 +514,12 @@
       // bloom at 1/6: less cost and less "glow" that turns into splotches on dark screens
       const bw = Math.max(1, (W / 6) | 0), bh = Math.max(1, (H / 6) | 0);
       this.a.setSize(bw, bh); this.b.setSize(bw, bh);
+      if (this.aoOn) {
+        const aw = Math.max(2, (W / 2) | 0), ah = Math.max(2, (H / 2) | 0);
+        this.aoRT.setSize(aw, ah);
+        this.aoMat.uniforms.uRes.value.set(aw, ah);
+        this.u.uAOTexel.value.set(1 / aw, 1 / ah);
+      }
       this.u.uRes.value.set(W, H); this.bw = bw; this.bh = bh;
     }
     pass(mat, target) { this.quad.material = mat; this.r.setRenderTarget(target); this.r.render(this.qs, this.cam); }
@@ -463,6 +529,14 @@
       r.clear(true, true, true);
       r.render(scene, camera);
       if (overlayScene) { r.autoClear = false; r.clearDepth(); r.render(overlayScene, camera); r.autoClear = true; }
+      if (this.aoOn) {
+        const au = this.aoMat.uniforms;
+        au.uProjInv.value.copy(camera.projectionMatrixInverse);
+        au.uProjScale.value = camera.projectionMatrix.elements[0] * 0.5;
+        au.uRot.value = (performance.now() * 0.00037) % 6.2832;
+        this.pass(this.aoMat, this.aoRT);
+        this.u.tAO.value = this.aoRT.texture;
+      }
       if (this.q.bloom) {
         this.bright.uniforms.tDiffuse.value = this.rt.texture; this.pass(this.bright, this.a);
         // 1 blur pair (used to be 2): half the cost, nearly the same look

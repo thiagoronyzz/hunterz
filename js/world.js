@@ -13,9 +13,9 @@
   // High prioritizes stable sharpness: 2K shadows (4K chokes most GPUs),
   // 2x MSAA and slightly lower vegetation density to avoid stutter and splotches.
   HZ.QUALITY = {
-    high: { terrainSeg: 240, radial: 8, branchRadial: 5, leafCards: 48, treeNear: 105, far: 520, grassD: 2.4, grassR: 44, fern: 7200, fernR: 60, bush: 1400, sapling: 900, flowers: 4500, twigs: 2800, stones: 2800, mushrooms: 1000, shadow: 2048, shadowR: 58, pixelRatio: 1.35, samples: 2, bloom: true, variants: 3, treeStep: 5.3 },
-    medium: { terrainSeg: 210, radial: 8, branchRadial: 4, leafCards: 46, treeNear: 95, far: 480, grassD: 2.0, grassR: 38, fern: 6000, fernR: 55, bush: 1200, sapling: 800, flowers: 3500, twigs: 2200, stones: 2200, mushrooms: 800, shadow: 2048, shadowR: 55, pixelRatio: 1.25, samples: 2, bloom: true, variants: 2, treeStep: 5.4 },
-    low: { terrainSeg: 140, radial: 6, branchRadial: 4, leafCards: 36, treeNear: 70, far: 380, grassD: 1.2, grassR: 26, fern: 3000, fernR: 40, bush: 700, sapling: 400, flowers: 1500, twigs: 900, stones: 900, mushrooms: 400, shadow: 1024, shadowR: 42, pixelRatio: 1, samples: 0, bloom: false, variants: 2, treeStep: 6.2 },
+    high: { terrainSeg: 240, radial: 8, branchRadial: 5, leafCards: 48, treeNear: 105, far: 520, grassD: 2.7, grassR: 46, fern: 7200, fernR: 60, bush: 1400, sapling: 900, flowers: 5200, twigs: 2800, stones: 2800, mushrooms: 1000, shadow: 2048, shadowR: 58, pixelRatio: 1.35, samples: 2, bloom: true, ao: true, variants: 3, treeStep: 5.3 },
+    medium: { terrainSeg: 210, radial: 8, branchRadial: 4, leafCards: 46, treeNear: 95, far: 480, grassD: 2.0, grassR: 38, fern: 6000, fernR: 55, bush: 1200, sapling: 800, flowers: 3500, twigs: 2200, stones: 2200, mushrooms: 800, shadow: 2048, shadowR: 55, pixelRatio: 1.25, samples: 2, bloom: true, ao: true, variants: 2, treeStep: 5.4 },
+    low: { terrainSeg: 140, radial: 6, branchRadial: 4, leafCards: 36, treeNear: 70, far: 380, grassD: 1.2, grassR: 26, fern: 3000, fernR: 40, bush: 700, sapling: 400, flowers: 1500, twigs: 900, stones: 900, mushrooms: 400, shadow: 1024, shadowR: 42, pixelRatio: 1, samples: 0, bloom: false, ao: false, variants: 2, treeStep: 6.2 },
   };
 
   // ================================================================= FIELDS
@@ -373,13 +373,14 @@
     const physics = (world.physics = new HZ.Physics(heightAt));
 
     // ------------------------------------------------ sky, fog, light
-    const sunDir = V(-0.42, 0.56, -0.71).normalize();
+    const sunDir = V(-0.44, 0.5, -0.72).normalize();
     world.sunDir = sunDir;
-    const skyU = { uSunDir: { value: sunDir }, uRain: { value: 0 }, uTime: { value: 0 }, uHorizon: { value: new THREE.Color().setRGB(0.62, 0.68, 0.66) }, uZenith: { value: new THREE.Color().setRGB(0.2, 0.36, 0.62) }, uSunI: { value: 1 }, uFlash: { value: 0 } };
+    const skyU = { uSunDir: { value: sunDir }, uRain: { value: 0 }, uTime: { value: 0 }, uHorizon: { value: new THREE.Color().setRGB(0.65, 0.69, 0.64) }, uZenith: { value: new THREE.Color().setRGB(0.19, 0.34, 0.6) }, uSunI: { value: 1 }, uFlash: { value: 0 } };
     const sky = new THREE.Mesh(new THREE.SphereGeometry(1800, 48, 24), new THREE.ShaderMaterial({ uniforms: skyU, vertexShader: SKY_VS, fragmentShader: SKY_FS, side: THREE.BackSide, depthWrite: false, fog: false }));
     sky.renderOrder = -10; sky.frustumCulled = false;
     scene.add(sky); world.sky = sky; world.skyU = skyU;
-    scene.fog = new THREE.FogExp2(new THREE.Color().setRGB(0.5, 0.56, 0.53), 0.0052);
+    // thin, slightly blue haze: depth cue without hiding the forest
+    scene.fog = new THREE.FogExp2(new THREE.Color().setRGB(0.54, 0.59, 0.56), 0.0045);
 
     // environment map from the sky (PBR indirect lighting)
     {
@@ -397,9 +398,9 @@
       pm.dispose();
     }
 
-    const hemi = new THREE.HemisphereLight(new THREE.Color().setRGB(0.55, 0.62, 0.7), new THREE.Color().setRGB(0.16, 0.14, 0.09), 0.55);
+    const hemi = new THREE.HemisphereLight(new THREE.Color().setRGB(0.55, 0.62, 0.7), new THREE.Color().setRGB(0.16, 0.14, 0.09), 0.62);
     scene.add(hemi); world.hemi = hemi;
-    const sun = new THREE.DirectionalLight(new THREE.Color().setRGB(1, 0.88, 0.72), 3.3);
+    const sun = new THREE.DirectionalLight(new THREE.Color().setRGB(1, 0.87, 0.7), 3.55);
     sun.castShadow = true;
     sun.shadow.mapSize.set(q.shadow, q.shadow);
     const sr = q.shadowR;
@@ -413,7 +414,7 @@
     await prog(0.12, 'Sculpting the terrain');
 
     // ------------------------------------------------ terrain
-    const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, normalMap: tx.groundN, normalScale: new THREE.Vector2(1.1, 1.1), envMapIntensity: 0.45 });
+    const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, normalMap: tx.groundN, normalScale: new THREE.Vector2(1.25, 1.25), envMapIntensity: 0.45 });
     const wetU = { value: 0 };
     world.wetU = wetU;
     terrainMat.onBeforeCompile = shader => {
@@ -437,7 +438,16 @@
           tcol *= 0.8 + macro * 1.1;
           tcol *= 1.0 - uWet * 0.28;
           diffuseColor.rgb *= tcol;`)
-        .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(roughness, 0.42, uWet * (0.4 + 0.6 * vSplat.z));');
+        .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(roughness, 0.42, uWet * (0.4 + 0.6 * vSplat.z));')
+        // dual-scale normal: fine soil relief up close, fading out before it can shimmer
+        // (the terrain always runs the tangent-space normal-map path)
+        .replace('#include <normal_fragment_maps>', `
+  vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;
+  float nFade = 1.0 - smoothstep(9.0, 32.0, length( vViewPosition ));
+  vec3 mapD = texture2D( normalMap, vNormalMapUv * 5.7 + 0.31 ).xyz * 2.0 - 1.0;
+  mapN = normalize( vec3( mapN.xy + mapD.xy * (0.65 * nFade), mapN.z ) );
+  mapN.xy *= normalScale;
+  normal = normalize( tbn * mapN );`);
     };
     terrainMat.customProgramCacheKey = () => 'terrain';
     world.terrainMat = terrainMat;
@@ -627,7 +637,7 @@
     impScene.add(new THREE.HemisphereLight(hemi.color, hemi.groundColor, 0.7));
     const impSun = new THREE.DirectionalLight(sun.color, 2.4); impSun.position.set(-3, 6, 8); impScene.add(impSun);
     const impCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
-    const IW = quality === 'low' ? 128 : quality === 'medium' ? 192 : 256;
+    const IW = quality === 'low' ? 128 : quality === 'medium' ? 224 : 288;
     const prevTarget = renderer.getRenderTarget();
     const prevClear = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
     const prevAutoClear = renderer.autoClear;

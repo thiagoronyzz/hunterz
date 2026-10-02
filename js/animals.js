@@ -12,7 +12,7 @@
   // Body: [x, y, a(half-height), b(half-width)] in meters; x = front, y = up.
   const SPECIES = {
     deer: {
-      name: 'Deer', hostile: 'prey', hp: 100, walk: 1.3, run: 9.2, turn: 2.6, radius: 0.5, sight: 48, hearing: 55, points: 150, vital: [0.12, 0.6],
+      name: 'Deer', hostile: 'prey', hp: 100, walk: 1.3, run: 9.2, turn: 2.6, radius: 0.5, sight: 48, hearing: 55, points: 150, vital: [0.12, 0.6], comfort: 15,
       body: [[-0.8, 1.0, 0.03, 0.03], [-0.76, 1.0, 0.17, 0.13], [-0.66, 1.0, 0.26, 0.19], [-0.48, 0.99, 0.3, 0.22], [-0.25, 0.97, 0.3, 0.23], [0, 0.97, 0.31, 0.23], [0.25, 1.0, 0.32, 0.22], [0.45, 1.04, 0.3, 0.19], [0.58, 1.08, 0.24, 0.15], [0.64, 1.12, 0.1, 0.08]],
       neck: { at: [0.5, 1.12], pts: [[0, 0, 0.17, 0.12], [0.1, 0.2, 0.14, 0.1], [0.2, 0.42, 0.11, 0.085], [0.26, 0.56, 0.1, 0.08]] },
       head: { pts: [[0.2, 0.64, 0.03, 0.03], [0.23, 0.66, 0.1, 0.085], [0.31, 0.64, 0.105, 0.08], [0.4, 0.58, 0.08, 0.06], [0.48, 0.52, 0.06, 0.045], [0.53, 0.49, 0.045, 0.035], [0.55, 0.48, 0.01, 0.01]], eye: [0.335, 0.675, 0.074, 0.018], ear: { at: [0.26, 0.72, 0.065], dir: [-0.35, 0.55, 0.75], len: 0.17, wid: 0.055 } },
@@ -45,7 +45,7 @@
       graze: -0.7,
     },
     boar: {
-      name: 'Boar', hostile: 'territorial', hp: 110, walk: 1.1, run: 8.0, turn: 3.0, radius: 0.5, sight: 30, hearing: 38, points: 200, vital: [0.1, 0.5], dmg: [15, 20], reach: 1.4, cd: 1.4,
+      name: 'Boar', hostile: 'territorial', hp: 110, walk: 1.1, run: 8.0, turn: 3.0, radius: 0.5, sight: 30, hearing: 38, points: 200, vital: [0.1, 0.5], dmg: [15, 20], reach: 1.4, cd: 1.4, comfort: 12,
       body: [[-0.62, 0.62, 0.03, 0.03], [-0.58, 0.62, 0.2, 0.18], [-0.45, 0.63, 0.28, 0.24], [-0.2, 0.64, 0.31, 0.26], [0.05, 0.67, 0.34, 0.27], [0.28, 0.72, 0.37, 0.26], [0.42, 0.72, 0.33, 0.23], [0.5, 0.7, 0.24, 0.19], [0.54, 0.68, 0.1, 0.1]],
       neck: { at: [0.45, 0.72], pts: [[0, 0, 0.26, 0.22], [0.1, -0.04, 0.24, 0.2], [0.18, -0.08, 0.22, 0.17]] },
       head: { pts: [[0.16, -0.06, 0.04, 0.04], [0.19, -0.04, 0.2, 0.16], [0.3, -0.08, 0.17, 0.13], [0.42, -0.14, 0.11, 0.09], [0.54, -0.2, 0.075, 0.07], [0.6, -0.22, 0.07, 0.065], [0.61, -0.22, 0.01, 0.01]], eye: [0.31, 0.0, 0.105, 0.012], ear: { at: [0.22, 0.1, 0.1], dir: [-0.3, 0.8, 0.5], len: 0.12, wid: 0.065 } },
@@ -56,7 +56,7 @@
       graze: -0.55, grazes: true, mane: true, tusks: true,
     },
     fox: {
-      name: 'Fox', hostile: 'prey', hp: 40, walk: 1.2, run: 8.4, turn: 4.0, radius: 0.3, sight: 40, hearing: 50, points: 120, vital: [0.04, 0.28],
+      name: 'Fox', hostile: 'prey', hp: 40, walk: 1.2, run: 8.4, turn: 4.0, radius: 0.3, sight: 40, hearing: 50, points: 120, vital: [0.04, 0.28], comfort: 11,
       body: [[-0.32, 0.36, 0.02, 0.02], [-0.29, 0.36, 0.08, 0.07], [-0.2, 0.36, 0.1, 0.085], [0, 0.36, 0.11, 0.09], [0.16, 0.37, 0.12, 0.085], [0.26, 0.38, 0.1, 0.075], [0.3, 0.39, 0.04, 0.04]],
       neck: { at: [0.24, 0.4], pts: [[0, 0, 0.07, 0.06], [0.06, 0.06, 0.06, 0.05], [0.1, 0.1, 0.055, 0.045]] },
       head: { pts: [[0.08, 0.1, 0.02, 0.02], [0.1, 0.11, 0.06, 0.06], [0.15, 0.1, 0.06, 0.055], [0.21, 0.08, 0.035, 0.03], [0.27, 0.06, 0.018, 0.016], [0.29, 0.06, 0.005, 0.005]], eye: [0.17, 0.13, 0.04, 0.009], ear: { at: [0.11, 0.155, 0.035], dir: [-0.15, 0.9, 0.35], len: 0.09, wid: 0.045 } },
@@ -67,7 +67,7 @@
       graze: -0.8,
     },
     rabbit: {
-      name: 'Rabbit', hostile: 'prey', hp: 20, walk: 0.9, run: 7.5, turn: 5.0, radius: 0.2, sight: 30, hearing: 45, points: 80, vital: [-0.05, 0.15], hop: true,
+      name: 'Rabbit', hostile: 'prey', hp: 20, walk: 0.9, run: 7.5, turn: 5.0, radius: 0.2, sight: 30, hearing: 45, points: 80, vital: [-0.05, 0.15], hop: true, comfort: 8,
       body: [[-0.2, 0.2, 0.02, 0.02], [-0.17, 0.21, 0.11, 0.1], [-0.08, 0.21, 0.13, 0.11], [0.04, 0.2, 0.11, 0.09], [0.12, 0.2, 0.08, 0.07], [0.16, 0.21, 0.03, 0.03]],
       neck: { at: [0.13, 0.24], pts: [[0, 0, 0.05, 0.045], [0.03, 0.03, 0.05, 0.045]] },
       head: { pts: [[0.02, 0.05, 0.02, 0.02], [0.04, 0.06, 0.055, 0.05], [0.09, 0.06, 0.05, 0.045], [0.13, 0.04, 0.03, 0.028], [0.15, 0.035, 0.01, 0.01]], eye: [0.09, 0.08, 0.04, 0.009], ear: { at: [0.05, 0.1, 0.022], dir: [-0.45, 0.88, 0.12], len: 0.13, wid: 0.035 } },
@@ -317,9 +317,15 @@
       fx.groundDecal(hc.x, hc.z, size * 0.45, size * 0.05, 0.75);
     }
 
-    setFlee(from, time) {
+    setFlee(from, time, quiet) {
       this.state = 'flee'; this.stateT = time; this.fleeFrom = from.clone ? from.clone() : V(from.x, 0, from.z);
       this.aware = 1.5; this.target = null;
+      // herd/pack panic: seeing a companion bolt makes nearby animals of the same species run too
+      if (!quiet && this.sp.hostile !== 'predator') {
+        for (const b of this.mgr.list) {
+          if (b !== this && !b.dead && b.type === this.type && b.state !== 'flee' && b.pos.distanceTo(this.pos) < 32) b.setFlee(this.fleeFrom, time * 0.75, true);
+        }
+      }
     }
     aggro(immediate) {
       if (this.dead) return;
@@ -330,8 +336,13 @@
     }
     hearShot(p, d) {
       if (this.dead) return;
-      if (this.sp.hostile === 'prey') { if (d < 130) this.setFlee(p, 10 + Math.random() * 6); }
-      else if (this.sp.hostile === 'territorial') { if (d < 45) this.aggro(); else if (d < 110) this.setFlee(p, 8); }
+      if (this.sp.hostile === 'prey') { if (d < 130) this.setFlee(p, 10 + Math.random() * 6); else if (d < 210) this.aware = Math.max(this.aware, 0.8); }
+      else if (this.sp.hostile === 'territorial') {
+        // a healthy boar runs from gunfire; only a wounded one answers it with a charge
+        if (this.hp < this.maxHp && d < 55) this.aggro();
+        else if (d < 130) this.setFlee(p, 8);
+        else if (d < 210) this.aware = Math.max(this.aware, 0.7);
+      }
       else if (d < 100 && this.state !== 'chase' && this.state !== 'attack') { this.state = 'investigate'; this.stateT = 25; this.target = V(p.x, 0, p.z); }
     }
 
@@ -373,11 +384,11 @@
         case 'idle': case 'graze': case 'walk': {
           if (this.aware > 1) {
             if (sp.hostile === 'prey') { this.setFlee(pl.pos, 9 + Math.random() * 6); if (this.type === 'deer' && Math.random() < 0.6) this.mgr.audio.bark(this.pos); }
-            else if (sp.hostile === 'territorial') { if (d < 22) this.aggro(); else this.setFlee(pl.pos, 6); }
+            else if (sp.hostile === 'territorial') { if (this.hp < this.maxHp && d < 26) this.aggro(); else this.setFlee(pl.pos, 8); }
             else { this.aggro(); if (this.type === 'wolf') this.mgr.alertPack(this); }
             break;
           }
-          if (this.aware > 0.5 && sp.hostile === 'prey') { this.state = 'idle'; this.targetSpeed = 0; this.alertLook = true; this.stateT = Math.max(this.stateT, 1); break; }
+          if (this.aware > 0.5 && sp.hostile !== 'predator') { this.state = 'watch'; this.stateT = 1.1 + Math.random() * 1.7; this.target = null; this.targetSpeed = 0; break; }
           this.alertLook = false;
           if (this.stateT <= 0) {
             const r = Math.random();
@@ -385,13 +396,40 @@
               this.state = 'walk'; this.stateT = 5 + Math.random() * 10;
               let tx, tz;
               if (sp.hostile === 'predator' && G.huntPressure && Math.random() < 0.45) { tx = pl.pos.x + (Math.random() - 0.5) * 60; tz = pl.pos.z + (Math.random() - 0.5) * 60; }
-              else { const a = Math.random() * TAU, R = 8 + Math.random() * 25; tx = this.x + Math.cos(a) * R; tz = this.z + Math.sin(a) * R; }
+              else {
+                const away = sp.hostile !== 'predator';
+                for (let tries = 0; tries < 5; tries++) {
+                  const a = Math.random() * TAU, R = 8 + Math.random() * 25;
+                  tx = this.x + Math.cos(a) * R; tz = this.z + Math.sin(a) * R;
+                  // prey never picks a destination closer to the hunter
+                  if (!away || Math.hypot(tx - pl.pos.x, tz - pl.pos.z) > Math.max(20, d * 0.95)) break;
+                }
+                if (away && Math.hypot(tx - pl.pos.x, tz - pl.pos.z) < Math.max(20, d * 0.95)) {
+                  const a = Math.atan2(this.z - pl.pos.z, this.x - pl.pos.x) + (Math.random() - 0.5) * 0.8;
+                  const R = 12 + Math.random() * 18;
+                  tx = this.x + Math.cos(a) * R; tz = this.z + Math.sin(a) * R;
+                }
+              }
               this.target = V(HZ.clamp(tx, -185, 185), 0, HZ.clamp(tz, -185, 185));
             } else if (r < 0.8 && sp.grazes !== false) { this.state = 'graze'; this.stateT = 4 + Math.random() * 8; this.target = null; }
             else { this.state = 'idle'; this.stateT = 2 + Math.random() * 4; this.target = null; }
           }
           this.targetSpeed = this.state === 'walk' ? sp.walk : 0;
           if (this.state === 'walk' && this.target && Math.hypot(this.target.x - this.x, this.target.z - this.z) < 1.5) { this.state = 'idle'; this.stateT = 1 + Math.random() * 3; }
+          break;
+        }
+        case 'watch': {
+          // froze, head up, eyes locked on the hunter — deciding between curiosity and flight
+          this.targetSpeed = 0;
+          if (this.aware > 1.05) {
+            if (sp.hostile === 'territorial' && this.hp < this.maxHp && d < 26) this.aggro();
+            else { this.setFlee(pl.pos, 8 + Math.random() * 5); if (this.type === 'deer' && Math.random() < 0.7) this.mgr.audio.bark(this.pos); }
+            break;
+          }
+          if (this.stateT <= 0) {
+            if (this.aware > 0.45) this.stateT = 0.6 + Math.random() * 0.9;
+            else { this.state = 'idle'; this.stateT = 1 + Math.random() * 2; }
+          }
           break;
         }
         case 'flee': {
@@ -449,6 +487,12 @@
           break;
         }
       }
+      // personal space: prey and boars never let the hunter get close — they keep their distance
+      const comfort = sp.comfort || 0;
+      if (comfort && d < comfort && this.state !== 'flee' && this.state !== 'attack' && this.state !== 'chase' && this.state !== 'charge') {
+        if (sp.hostile === 'territorial' && this.hp < this.maxHp) this.aggro(true);
+        else this.setFlee(pl.pos, 5 + Math.random() * 3);
+      }
       this.soundT -= dt;
       if (this.soundT <= 0 && (this.state === 'idle' || this.state === 'walk' || this.state === 'graze')) {
         this.soundT = 12 + Math.random() * 25;
@@ -505,7 +549,7 @@
       if (this.overrun > 0) this.overrun -= ddt;
       // direction
       let desired = this.heading;
-      if (this.state === 'attack' || this.state === 'rear' || this.alertLook) desired = Math.atan2(-dz, dx);
+      if (this.state === 'attack' || this.state === 'rear' || this.state === 'watch' || this.alertLook) desired = Math.atan2(-dz, dx);
       else if (this.target && this.targetSpeed > 0) desired = this.steer(ddt, G);
       const turnRate = this.sp.turn * (this.speed > this.sp.walk * 2 ? 1.3 : 1);
       const diff = HZ.angleDiff(this.heading, desired);
@@ -569,6 +613,7 @@
       if (this.state === 'graze') nt = sp.graze + Math.sin(G.time * 1.3 + this.phase * 20) * 0.05;
       else if (this.state === 'flee' || this.state === 'chase' || this.state === 'charge') nt = this.type === 'deer' ? -0.15 : -0.3;
       else if (this.state === 'attack') { const t = this.attackT; nt = this.type === 'boar' ? -0.4 + Math.sin(Math.min(1, t / 0.4) * Math.PI) * 0.9 : -0.25 + Math.sin(Math.min(1, t / 0.35) * Math.PI) * 0.35; }
+      else if (this.state === 'watch') nt = 0.36 + Math.sin(G.time * 2.1 + this.phase * 9) * 0.03; // head high, ears on the hunter
       else if (this.alertLook) { nt = 0.12; const dd = Math.atan2(-(G.player.pos.z - this.z), G.player.pos.x - this.x); ny = HZ.clamp(HZ.angleDiff(this.heading, dd), -0.9, 0.9); }
       else if (this.state === 'rear') nt = 0.35;
       if (gait === GAITS.gallop) nt += Math.sin(TAU * this.phase + 1) * 0.08 * amp;
