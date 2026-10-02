@@ -45,7 +45,8 @@
       graze: -0.7,
     },
     boar: {
-      name: 'Boar', hostile: 'territorial', hp: 110, walk: 1.1, run: 8.0, turn: 3.0, radius: 0.5, sight: 30, hearing: 38, points: 200, vital: [0.1, 0.5], dmg: [15, 20], reach: 1.4, cd: 1.4,
+      // Boars avoid the hunter like the other non-predators instead of auto-charging.
+      name: 'Boar', hostile: 'prey', hp: 110, walk: 1.1, run: 8.0, turn: 3.0, radius: 0.5, sight: 34, hearing: 44, points: 200, vital: [0.1, 0.5], dmg: [15, 20], reach: 1.4, cd: 1.4,
       body: [[-0.62, 0.62, 0.03, 0.03], [-0.58, 0.62, 0.2, 0.18], [-0.45, 0.63, 0.28, 0.24], [-0.2, 0.64, 0.31, 0.26], [0.05, 0.67, 0.34, 0.27], [0.28, 0.72, 0.37, 0.26], [0.42, 0.72, 0.33, 0.23], [0.5, 0.7, 0.24, 0.19], [0.54, 0.68, 0.1, 0.1]],
       neck: { at: [0.45, 0.72], pts: [[0, 0, 0.26, 0.22], [0.1, -0.04, 0.24, 0.2], [0.18, -0.08, 0.22, 0.17]] },
       head: { pts: [[0.16, -0.06, 0.04, 0.04], [0.19, -0.04, 0.2, 0.16], [0.3, -0.08, 0.17, 0.13], [0.42, -0.14, 0.11, 0.09], [0.54, -0.2, 0.075, 0.07], [0.6, -0.22, 0.07, 0.065], [0.61, -0.22, 0.01, 0.01]], eye: [0.31, 0.0, 0.105, 0.012], ear: { at: [0.22, 0.1, 0.1], dir: [-0.3, 0.8, 0.5], len: 0.12, wid: 0.065 } },
@@ -366,6 +367,15 @@
         const gain = (s.canSee ? 1.4 * (1 - d / (s.sightR + 1)) + 0.25 : 0) + (s.canHear ? 0.8 : 0);
         this.aware = gain > 0 ? this.aware + gain * 0.3 * (pl.moving ? 1 : 0.5) : Math.max(0, this.aware - 0.06);
         this.lastSenseSee = s.canSee;
+        this.lastSenseHear = s.canHear;
+      }
+      // A clear sighting or nearby sound sends every non-predator into flight at once.
+      // The short proximity fallback covers quiet hunters at close range and stops
+      // wandering prey from drifting right up to the player before awareness builds.
+      if (sp.hostile === 'prey' && pl.alive && this.state !== 'flee'
+          && (this.lastSenseSee || this.lastSenseHear || d < Math.min(12, sp.sight * 0.35))) {
+        this.setFlee(pl.pos, 12 + Math.random() * 5);
+        if (this.type === 'deer' && Math.random() < 0.45) this.mgr.audio.bark(this.pos);
       }
       if (!pl.alive && sp.hostile !== 'prey' && (this.state === 'chase' || this.state === 'attack' || this.state === 'charge')) { this.state = 'idle'; this.stateT = 5; this.aware = 0; }
       this.stateT -= dt;

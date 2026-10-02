@@ -1,5 +1,5 @@
-/* Spawns the fauna through the real js/animals.js manager and asserts the species
-   names that surface in the kill feed / interaction hint are the English ones. */
+/* Spawns fauna through the real manager and checks names, predator/prey reactions,
+   and that mission targets remain possible with the generated wildlife roster. */
 const path = require('path');
 const boot = require('./harness.js');
 const ROOT = path.join(__dirname, '..');
@@ -35,6 +35,26 @@ else console.log('PASS species names');
 const hint = `${mgr.list[0].sp.name.toUpperCase()} DOWN`;
 if (/[à-ÿ]/.test(hint) || !/^[A-Z ]+ DOWN$/.test(hint)) { fails++; console.log('FAIL hint text', hint); }
 else console.log('PASS interaction hint text:', JSON.stringify(hint));
+
+// Every animal that is not a predator should flee on sight, including boars.
+const player = { pos: { x: 0, y: 0, z: 0, clone() { return { x: this.x, y: this.y, z: this.z }; } }, alive: true, moving: true, noise: 0, crouch: false };
+const perception = { player, time: 1, rain: false };
+for (const type of ['deer', 'boar', 'fox', 'rabbit']) {
+  const animal = mgr.list.find(a => a.type === type);
+  animal.state = 'walk'; animal.stateT = 10; animal.aware = 0; animal.senseT = 0;
+  animal.sense = () => ({ canSee: true, canHear: false, sightR: animal.sp.sight });
+  animal.think(0.016, perception, 20);
+  if (animal.state !== 'flee' || animal.targetSpeed <= 0) { fails++; console.log(`FAIL ${type} should flee from a hunter in sight`); }
+  else console.log(`PASS ${type} flees on sight`);
+}
+for (const type of ['wolf', 'bear']) {
+  const animal = mgr.list.find(a => a.type === type);
+  animal.state = 'idle'; animal.stateT = 10; animal.aware = 0; animal.senseT = 0;
+  animal.sense = () => ({ canSee: true, canHear: false, sightR: animal.sp.sight });
+  animal.think(0.016, perception, 20);
+  if (animal.state === 'flee') { fails++; console.log(`FAIL ${type} predator incorrectly flees`); }
+  else console.log(`PASS ${type} remains predator behavior`);
+}
 
 // ---------------------------------------------------------------- mission feasibility
 // every contract in the pool must be solvable with the animals this forest spawns

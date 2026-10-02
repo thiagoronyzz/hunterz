@@ -19,6 +19,9 @@
     death: $('deathScreen'), deathCause: $('deathCause'), deathStats: $('deathStats'), retry: $('retryButton'),
     end: $('endScreen'), finalKills: $('finalKills'), finalAccuracy: $('finalAccuracy'), finalTime: $('finalTime'), rankingEntry: $('rankingEntry'), notQualified: $('notQualified'), playerName: $('playerName'), saveRank: $('saveRankButton'), rankMessage: $('rankMessage'), playAgain: $('playAgainButton'),
     loading: $('loadingScreen'), loadFill: $('loadFill'), loadMsg: $('loadMsg'), loadError: $('loadError'), loadErrorDetail: $('loadErrorDetail'), retryLow: $('retryLowButton'), unsupported: $('unsupported'),
+    touchControls: $('touchControls'), touchStick: $('touchStick'), touchKnob: $('touchKnob'), touchPause: $('touchPause'),
+    touchFire: $('touchFire'), touchAim: $('touchAim'), touchSprint: $('touchSprint'), touchCrouch: $('touchCrouch'),
+    touchJump: $('touchJump'), touchReload: $('touchReload'), touchBandage: $('touchBandage'), touchBreath: $('touchBreath'),
   };
   let lowRetryBound = false;
   const retryAtLow = () => {
@@ -49,7 +52,11 @@
   const QKEY = 'hunterz-quality';
   // accepts legacy Portuguese quality ids saved in old localStorage/URLs
   const QUALITY_ALIASES = { baixa: 'low', media: 'medium', alta: 'high' };
-  const isMobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    || Number(navigator.maxTouchPoints) > 0
+    || !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  const touchCapable = isMobile;
+  if (touchCapable) UI.touchControls.classList.add('touch-enabled');
   let quality = params.get('q') || localStorage.getItem(QKEY) || (isMobile ? 'low' : 'medium');
   quality = QUALITY_ALIASES[quality] || quality;
   if (!HZ.QUALITY[quality]) quality = 'medium';
@@ -180,6 +187,7 @@
   const S = {
     mode: 'loading', rain: false, rainAmt: 0, startTime: 0, elapsed: 0, shots: 0, hits: 0, kills: 0, total: 0, ammo: MAG, reserve: RESERVE,
     aim: 0, aimHeld: false, fire: false, lookDX: 0, lookDY: 0, keys: {}, time: 0, flashT: 0, nextLightning: 20, recoilPitch: 0, recoilYaw: 0,
+    touchMove: { x: 0, y: 0 }, touchSprint: false, touchJump: false, touchBreath: false,
     lastHeart: 0, huntPressure: false, dmgDirT: 0, hintT: 0, lastSpottedT: -99,
   };
   // score + contracts for the current hunt
@@ -226,6 +234,12 @@
       UI.contractList.appendChild(li);
     }
   }
+  function syncTouchButtons() {
+    UI.touchAim.classList.toggle('active', S.aimHeld);
+    UI.touchSprint.classList.toggle('active', S.touchSprint);
+    UI.touchCrouch.classList.toggle('active', P.crouch);
+    UI.touchBreath.classList.toggle('active', S.touchBreath);
+  }
   // blood smear on screen (generated)
   (function makeBlood() {
     const c = document.createElement('canvas'); c.width = 512; c.height = 288; const g = c.getContext('2d');
@@ -267,9 +281,11 @@
   // Some hosts (embedded previews, strict permission policies) refuse the pointer lock.
   // When that happens the hunter falls back to hold-to-look: drag with the left button to
   // turn the head, quick tap to shoot, right button still scopes.
-  let lockBlocked = false, drag = null;
-  const look = (dx, dy) => {
-    const sens = 0.0021 * (camera.fov / 72);
+  let lockBlocked = false, drag = null, touchLookId = null, touchLast = null, stickPointerId = null;
+  const look = (dx, dy, inputScale = 1) => {
+    // Keep touch aiming responsive when the scope narrows the camera FOV.
+    const zoomScale = touchCapable ? Math.max(0.48, camera.fov / 72) : camera.fov / 72;
+    const sens = 0.0021 * zoomScale * inputScale;
     P.yaw -= dx * sens; P.pitch -= dy * sens;
     P.pitch = HZ.clamp(P.pitch, -1.48, 1.48);
     S.lookDX += dx; S.lookDY += dy;
@@ -279,8 +295,8 @@
     lockBlocked = true;
     if (S.mode === 'playing') toast('Mouse capture is blocked here — drag with the left button to look around.', 5200);
   };
-  const lock = () => {
-    if (lockBlocked) return;
+  const lock = (fromMouse = false) => {
+    if (lockBlocked || (touchCapable && !fromMouse)) return;
     try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(useFallbackLook); } catch (_) { useFallbackLook(); }
   };
   document.addEventListener('pointerlockerror', useFallbackLook);
@@ -299,38 +315,126 @@
   });
   canvas.addEventListener('mousedown', (e) => {
     if (S.mode !== 'playing') return;
-    if (document.pointerLockElement !== canvas && !lockBlocked) { lock(); return; }
-    if (e.button === 2) { S.aimHeld = true; audio.aim(true); return; }
+    if (document.pointerLockElement !== canvas && !lockBlocked) { lock(true); return; }
+    if (e.button === 2) { S.aimHeld = true; audio.aim(true); syncTouchButtons(); return; }
     if (e.button !== 0) return;
     if (lockBlocked) drag = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
     else S.fire = true;
   });
   window.addEventListener('mouseup', (e) => {
-    if (e.button === 2) { S.aimHeld = false; return; }
+    if (e.button === 2) { S.aimHeld = false; audio.aim(false); syncTouchButtons(); return; }
     if (e.button !== 0 || !lockBlocked) return;
     const d = drag; drag = null;
     // a short press without dragging is a shot, a drag was just looking around
     if (d && d.moved < 8 && performance.now() - d.t < 400 && S.mode === 'playing' && P.alive) S.fire = true;
   });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // Multi-touch: left thumb steers, right thumb looks around; action buttons remain
+  // independent so aiming, moving and firing can happen at the same time.
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!touchCapable || e.pointerType === 'mouse' || S.mode !== 'playing' || !P.alive) return;
+    const r = canvas.getBoundingClientRect();
+    if (e.clientX < r.left + r.width * 0.42 && e.clientY > r.top + r.height * 0.42) return;
+    e.preventDefault(); touchLookId = e.pointerId; touchLast = { x: e.clientX, y: e.clientY };
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  }, { passive: false });
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== touchLookId || !touchLast || S.mode !== 'playing' || !P.alive) return;
+    e.preventDefault();
+    const dx = e.clientX - touchLast.x, dy = e.clientY - touchLast.y;
+    touchLast = { x: e.clientX, y: e.clientY };
+    look(dx, dy, 1.3);
+  }, { passive: false });
+  const endTouchLook = (e) => {
+    if (e.pointerId !== touchLookId) return;
+    touchLookId = null; touchLast = null;
+  };
+  canvas.addEventListener('pointerup', endTouchLook);
+  canvas.addEventListener('pointercancel', endTouchLook);
+
+  const moveStick = (e) => {
+    const r = UI.touchStick.getBoundingClientRect();
+    const max = Math.max(22, Math.min(r.width, r.height) * 0.31);
+    let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const len = Math.hypot(dx, dy), scale = len > max ? max / len : 1;
+    dx *= scale; dy *= scale;
+    const raw = HZ.clamp(Math.hypot(dx, dy) / max, 0, 1);
+    const amount = raw < 0.08 ? 0 : (raw - 0.08) / 0.92;
+    const dirLen = Math.hypot(dx, dy) || 1;
+    S.touchMove.x = dx / dirLen * amount;
+    S.touchMove.y = -dy / dirLen * amount;
+    UI.touchKnob.style.transform = `translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`;
+  };
+  const clearStick = () => {
+    stickPointerId = null; S.touchMove.x = 0; S.touchMove.y = 0;
+    UI.touchKnob.style.transform = 'translate(-50%,-50%)';
+  };
+  UI.touchStick.addEventListener('pointerdown', (e) => {
+    if (!touchCapable || e.pointerType === 'mouse' || S.mode !== 'playing' || !P.alive) return;
+    e.preventDefault(); stickPointerId = e.pointerId;
+    try { UI.touchStick.setPointerCapture(e.pointerId); } catch (_) {}
+    moveStick(e);
+  }, { passive: false });
+  UI.touchStick.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== stickPointerId || S.mode !== 'playing') return;
+    e.preventDefault(); moveStick(e);
+  }, { passive: false });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    UI.touchStick.addEventListener(type, (e) => { if (e.pointerId === stickPointerId) clearStick(); });
+  }
+  function bindTouchAction(el, press, release = () => {}) {
+    const active = new Set();
+    el.addEventListener('pointerdown', (e) => {
+      if (!touchCapable || e.pointerType === 'mouse' || S.mode !== 'playing' || !P.alive) return;
+      e.preventDefault(); active.add(e.pointerId);
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+      press(e);
+    }, { passive: false });
+    const end = (e) => {
+      if (!active.has(e.pointerId)) return;
+      active.delete(e.pointerId); release(e);
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+    el.addEventListener('lostpointercapture', end);
+  }
+  bindTouchAction(UI.touchFire, () => { S.fire = true; });
+  bindTouchAction(UI.touchAim, () => { S.aimHeld = !S.aimHeld; audio.aim(S.aimHeld); syncTouchButtons(); });
+  bindTouchAction(UI.touchSprint, () => { S.touchSprint = true; syncTouchButtons(); }, () => { S.touchSprint = false; syncTouchButtons(); });
+  bindTouchAction(UI.touchCrouch, () => { P.crouch = !P.crouch; syncTouchButtons(); });
+  bindTouchAction(UI.touchJump, () => { S.touchJump = true; });
+  bindTouchAction(UI.touchBreath, () => { S.touchBreath = true; syncTouchButtons(); }, () => { S.touchBreath = false; syncTouchButtons(); });
+  bindTouchAction(UI.touchReload, () => reload());
+  bindTouchAction(UI.touchBandage, () => useBandage());
+  bindTouchAction(UI.touchPause, () => pauseGame());
+
   window.addEventListener('keydown', (e) => {
     S.keys[e.code] = true;
     if (e.code === 'Escape' && S.mode === 'playing') { pauseGame(); return; }
     if (S.mode !== 'playing') return;
     if (e.code === 'KeyR') reload();
-    if (e.code === 'KeyC' || e.code === 'ControlLeft') { P.crouch = !P.crouch; e.preventDefault(); }
+    if ((e.code === 'KeyC' || e.code === 'ControlLeft') && !e.repeat) { P.crouch = !P.crouch; syncTouchButtons(); e.preventDefault(); }
     if (e.code === 'KeyQ') useBandage();
     if (e.code === 'Space') e.preventDefault();
   });
   window.addEventListener('keyup', (e) => { S.keys[e.code] = false; });
-  window.addEventListener('blur', () => { S.keys = {}; S.aimHeld = false; });
+  window.addEventListener('blur', () => {
+    S.keys = {}; S.aimHeld = false; S.touchSprint = false; S.touchJump = false; S.touchBreath = false;
+    touchLookId = null; touchLast = null;
+    if (UI.touchStick) clearStick();
+    syncTouchButtons();
+  });
 
   // ---------------------------------------------------------------- flow
   function resetPlayer() {
     P.pos.set(SPAWN.x, HZ.heightAt(SPAWN.x, SPAWN.z), SPAWN.z); P.vel.set(0, 0, 0); P.knock.set(0, 0, 0);
     P.yaw = 0; P.pitch = 0; P.hp = 100; P.hpLag = 100; P.stamina = 100; P.alive = true; P.bandages = 3; P.bandaging = 0; P.bleeding = 0;
     P.crouch = false; P.deathT = 0; P.hurt = 0; P.shake = 0; P.lastHurt = -99; P.eyeY = P.pos.y + 1.68;
+    S.touchMove.x = 0; S.touchMove.y = 0; S.touchSprint = false; S.touchJump = false; S.touchBreath = false;
+    touchLookId = null; touchLast = null; stickPointerId = null; UI.touchKnob.style.transform = 'translate(-50%,-50%)';
     S.ammo = MAG; S.reserve = RESERVE; S.shots = 0; S.hits = 0; S.kills = 0; S.aim = 0; S.aimHeld = false; S.fire = false;
+    syncTouchButtons();
     S.lastSpottedT = -99; score.reset();
     rifle.state = 'ready'; post.u.uDead.value = 0; camera.rotation.z = 0;
   }
@@ -342,10 +446,11 @@
     S.mode = 'playing'; S.startTime = performance.now(); S.elapsed = 0; S.huntPressure = false;
     UI.start.classList.add('hidden'); UI.pause.classList.add('hidden'); UI.death.classList.add('hidden'); UI.end.classList.add('hidden');
     UI.hud.classList.remove('hidden'); UI.topbar.classList.remove('hidden');
-    updateAmmoUI(); updateAnimalUI();
+    UI.touchControls.classList.toggle('touch-live', touchCapable);
+    updateAmmoUI(); updateAnimalUI(); syncTouchButtons();
     world.forceUpdate();
     lock();
-    toast('Careful: wolves, bears and boars can attack. Good hunting.', 3500);
+    toast('Deer, foxes, rabbits and boars flee; wolves and bears may attack.', 3500);
   }
   function restartGame() {
     effects.clear();
@@ -353,8 +458,18 @@
     UI.rankingEntry.classList.add('hidden'); UI.notQualified.classList.add('hidden'); UI.rankMessage.textContent = ''; UI.playerName.value = ''; UI.playerName.disabled = false; UI.saveRank.disabled = false;
     startGame();
   }
-  function pauseGame() { if (S.mode !== 'playing') return; S.mode = 'paused'; S.pauseAt = performance.now(); UI.pause.classList.remove('hidden'); S.keys = {}; S.aimHeld = false; document.exitPointerLock && document.exitPointerLock(); }
-  function resumeGame() { if (S.mode !== 'paused') return; S.startTime += performance.now() - S.pauseAt; S.mode = 'playing'; UI.pause.classList.add('hidden'); lock(); }
+  function pauseGame() {
+    if (S.mode !== 'playing') return;
+    S.mode = 'paused'; S.pauseAt = performance.now(); UI.pause.classList.remove('hidden');
+    UI.touchControls.classList.remove('touch-live'); S.keys = {}; S.aimHeld = false; S.touchSprint = false; S.touchJump = false; S.touchBreath = false;
+    touchLookId = null; touchLast = null; clearStick(); syncTouchButtons(); audio.aim(false);
+    document.exitPointerLock && document.exitPointerLock();
+  }
+  function resumeGame() {
+    if (S.mode !== 'paused') return;
+    S.startTime += performance.now() - S.pauseAt; S.mode = 'playing'; UI.pause.classList.add('hidden');
+    UI.touchControls.classList.toggle('touch-live', touchCapable); lock();
+  }
   function setRain(on) { S.rain = on; UI.rain.checked = on; UI.weather.classList.toggle('rain', on); UI.weatherLabel.textContent = on ? 'Heavy rain' : 'Clear sky'; }
   UI.startBtn.addEventListener('click', startGame);
   UI.resume.addEventListener('click', resumeGame);
@@ -392,7 +507,7 @@
     renderBreakdown();
     const total = score.total;
     const ok = qualifies(total); UI.rankingEntry.classList.toggle('hidden', !ok); UI.notQualified.classList.toggle('hidden', ok);
-    UI.end.classList.remove('hidden'); UI.hud.classList.add('hidden');
+    UI.end.classList.remove('hidden'); UI.hud.classList.add('hidden'); UI.touchControls.classList.remove('touch-live');
   }
 
   // ---------------------------------------------------------------- player damage
@@ -414,7 +529,9 @@
   }
   function killPlayer(src, cause) {
     P.hp = 0; P.alive = false; P.deathT = 0; P.killer = src;
-    S.aimHeld = false; S.aim = 0;
+    S.aimHeld = false; S.aim = 0; S.touchSprint = false; S.touchJump = false; S.touchBreath = false;
+    touchLookId = null; touchLast = null; clearStick(); syncTouchButtons();
+    UI.touchControls.classList.remove('touch-live');
     const names = { wolf: 'A WOLF', bear: 'A BEAR', boar: 'A BOAR' };
     UI.deathCause.textContent = cause === 'fall' ? 'KILLED BY THE FALL'
       : src ? `ATTACKED BY ${names[src.type] || 'AN ANIMAL'}` : 'YOU BLED OUT';
@@ -513,11 +630,17 @@
     const k = S.keys;
     const alive = P.alive && S.mode === 'playing';
     let ix = 0, iz = 0;
-    if (alive) { if (k.KeyW || k.ArrowUp) iz += 1; if (k.KeyS || k.ArrowDown) iz -= 1; if (k.KeyD || k.ArrowRight) ix += 1; if (k.KeyA || k.ArrowLeft) ix -= 1; }
-    const il = Math.hypot(ix, iz); if (il > 0) { ix /= il; iz /= il; }
-    const shift = k.ShiftLeft || k.ShiftRight;
+    if (alive) {
+      if (k.KeyW || k.ArrowUp) iz += 1; if (k.KeyS || k.ArrowDown) iz -= 1;
+      if (k.KeyD || k.ArrowRight) ix += 1; if (k.KeyA || k.ArrowLeft) ix -= 1;
+      ix += S.touchMove.x; iz += S.touchMove.y;
+    }
+    const il = Math.hypot(ix, iz), inputAmount = Math.min(1, il);
+    if (il > 0) { ix /= il; iz /= il; }
+    const shift = k.ShiftLeft || k.ShiftRight || (S.touchSprint && il > 0.2);
     P.sprintLock = Math.max(0, P.sprintLock - dt);
-    const wantSprint = shift && iz > 0.3 && !P.crouch && S.aim < 0.3 && P.stamina > 2 && P.bandaging <= 0 && rifle.state !== 'reloading' && P.sprintLock <= 0;
+    const wantsForward = (k.ShiftLeft || k.ShiftRight) ? iz > 0.3 : (S.touchSprint && iz > 0.12);
+    const wantSprint = shift && il > 0.58 && wantsForward && !P.crouch && S.aim < 0.3 && P.stamina > 2 && P.bandaging <= 0 && rifle.state !== 'reloading' && P.sprintLock <= 0;
     P.sprinting = wantSprint && P.onGround ? true : P.sprinting && wantSprint;
     const water = HZ.isWater(P.pos.x, P.pos.z, -0.25);
     let speed = P.sprinting ? 6.3 : P.crouch ? 1.75 : 3.5;
@@ -526,12 +649,15 @@
     if (water) speed *= 0.55;
     if (P.hp < 25) speed *= 0.85;
     const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
-    const tx = (fx * iz + rx * ix) * speed, tz = (fz * iz + rz * ix) * speed;
-    const acc = P.onGround ? 11 : 2;
-    P.vel.x += (tx - P.vel.x) * Math.min(1, acc * dt); P.vel.z += (tz - P.vel.z) * Math.min(1, acc * dt);
-    // jump
-    if (alive && k.Space && P.onGround && P.stamina > 8 && !P.crouch) { P.vel.y = 5.3; P.onGround = false; P.stamina -= 10; }
-    if (alive && k.Space && P.crouch) P.crouch = false;
+    const tx = (fx * iz + rx * ix) * speed * inputAmount, tz = (fz * iz + rz * ix) * speed * inputAmount;
+    const acc = P.onGround ? (inputAmount > 0.01 ? (P.sprinting ? 8.5 : 9.5) : 13) : 2.4;
+    const blend = 1 - Math.exp(-acc * dt);
+    P.vel.x += (tx - P.vel.x) * blend; P.vel.z += (tz - P.vel.z) * blend;
+    // A tap jumps once; holding the keyboard key can still auto-hop on landing.
+    const jumpPressed = k.Space || S.touchJump;
+    if (alive && jumpPressed && P.onGround && P.stamina > 8 && !P.crouch) { P.vel.y = 5.3; P.onGround = false; P.stamina -= 10; }
+    if (alive && jumpPressed && P.crouch) P.crouch = false;
+    S.touchJump = false;
     P.vel.y -= 17 * dt;
     // knockback from attacks
     P.knock.multiplyScalar(Math.exp(-6 * dt));
@@ -595,7 +721,7 @@
     // scope sway (breathing, fatigue, movement)
     let swx = 0, swy = 0;
     const scoped = S.aim > 0.85;
-    const shift = S.keys.ShiftLeft || S.keys.ShiftRight;
+    const shift = S.keys.ShiftLeft || S.keys.ShiftRight || (touchCapable && S.touchBreath);
     P.holdBreath = scoped && shift && P.stamina > 3;
     if (S.aim > 0.3) {
       const fat = 1 + (1 - P.stamina / 100) * 1.8 + P.moveAmt * 2.5 + (P.hp < 30 ? 1 : 0);
@@ -656,6 +782,7 @@
     UI.hpBar.classList.toggle('low', hp < 30);
     UI.stFill.style.width = P.stamina + '%';
     UI.bandageCount.textContent = P.bandages;
+    syncTouchButtons();
     UI.sound.style.width = Math.round(P.noise * 100) + '%';
     const hdg = ((-P.yaw * 180 / Math.PI) % 360 + 360) % 360, i = Math.round(hdg / 45) % 8;
     UI.compM.textContent = DIRS[i]; UI.compL.textContent = DIRS[(i + 7) % 8]; UI.compR.textContent = DIRS[(i + 1) % 8];

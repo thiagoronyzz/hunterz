@@ -69,6 +69,25 @@
       </aside>
 
       <div class="controls-reminder"><kbd>WASD</kbd> move <kbd>SHIFT</kbd> sprint <kbd>C</kbd> crouch <kbd>SPACE</kbd> jump <kbd>RIGHT BUTTON</kbd> scope <kbd>CLICK</kbd> shoot <kbd>R</kbd> reload <kbd>Q</kbd> bandage <kbd>ESC</kbd> pause</div>
+
+      <div id="touchControls" class="touch-controls" aria-label="Touch controls">
+        <button id="touchPause" class="touch-pause" type="button" aria-label="Pause hunt">Ⅱ</button>
+        <div id="touchStick" class="touch-stick" role="application" aria-label="Movement joystick">
+          <span class="touch-stick__track" aria-hidden="true"></span>
+          <span id="touchKnob" class="touch-stick__knob" aria-hidden="true"></span>
+          <span class="touch-stick__label" aria-hidden="true">MOVE</span>
+        </div>
+        <div class="touch-actions" aria-label="Hunt actions">
+          <button id="touchSprint" class="touch-action" type="button" aria-label="Hold to sprint"><span>»</span><small>RUN</small></button>
+          <button id="touchAim" class="touch-action" type="button" aria-label="Toggle scope"><span>◎</span><small>AIM</small></button>
+          <button id="touchCrouch" class="touch-action" type="button" aria-label="Toggle crouch"><span>⌄</span><small>CROUCH</small></button>
+          <button id="touchJump" class="touch-action" type="button" aria-label="Jump"><span>↑</span><small>JUMP</small></button>
+          <button id="touchReload" class="touch-action" type="button" aria-label="Reload rifle"><span>↻</span><small>RELOAD</small></button>
+          <button id="touchBandage" class="touch-action" type="button" aria-label="Use a bandage"><span>✚</span><small>HEAL</small></button>
+          <button id="touchBreath" class="touch-action" type="button" aria-label="Hold breath while scoped"><span>⌁</span><small>BREATH</small></button>
+          <button id="touchFire" class="touch-action touch-action--fire" type="button" aria-label="Fire rifle"><span>●</span><small>FIRE</small></button>
+        </div>
+      </div>
     </section>
 
     <section id="startScreen" class="overlay start-screen hidden">
@@ -80,7 +99,7 @@
           <p class="tagline">Breathe. Listen. The forest hunts you too.</p>
         </div>
         <div class="menu-actions">
-          <button id="startButton" class="primary-button" type="button"><span>START HUNT</span><small>Deer, boars, foxes, rabbits — plus wolves and bears that attack</small></button>
+          <button id="startButton" class="primary-button" type="button"><span>START HUNT</span><small>Prey reacts and flees; wolves and bears hunt you back</small></button>
           <div class="setting-row">
             <div><strong>Dynamic weather</strong><small>Heavy rain with thunder</small></div>
             <label class="switch"><input id="rainToggle" type="checkbox" /><span></span><b>RAIN</b></label>
@@ -115,6 +134,7 @@
           <div><kbd>C</kbd><span>CROUCH</span></div>
           <div><kbd>Q</kbd><span>BANDAGE</span></div>
         </div>
+        <p class="mobile-hint">LEFT STICK TO MOVE · DRAG TO LOOK · FIRE TO SHOOT</p>
       </div>
       <p class="ethics">VIRTUAL HUNT · NO REAL ANIMAL WAS HARMED</p>
     </section>

@@ -57,7 +57,7 @@ const check = (name, got, pred) => {
 
   G.startGame();
   G.setRain(false);
-  check('toast on start', el.get('toast').textContent, v => /Careful: wolves, bears and boars can attack\. Good hunting\./.test(v) && isEn(v));
+  check('toast on start', el.get('toast').textContent, v => /Deer, foxes, rabbits and boars flee; wolves and bears may attack\./.test(v) && isEn(v));
   check('mission text (contracts)', el.get('missionText').textContent, v => v === G.contracts.active.desc && !/[à-ÿ]/.test(v));
   check('contracts rolled for the hunt', G.contracts.list.length, v => v === 3);
   check('contract list rendered', el.get('contractList').children.length, v => v === 3);
