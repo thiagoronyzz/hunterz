@@ -137,7 +137,11 @@
       this.noiseBurst({ dur: 0.1, type: 'lowpass', f: 300, gain: 0.5, verb: 0 });
     }
     heartbeat(rate = 1) { this.tone({ type: 'sine', f: 55, f1: 40, dur: 0.12, gain: 0.35 * rate, verb: 0 }); this.tone({ type: 'sine', f: 50, f1: 38, dur: 0.12, gain: 0.25 * rate, t0: 0.22, verb: 0 }); }
-    breath() { this.noiseBurst({ dur: 0.6, type: 'bandpass', f: 1100, Q: 0.8, gain: 0.05, a: 0.2, verb: 0, pink: true }); }
+    breath() {
+      // exhausted exhale, then a shorter inhale
+      this.noiseBurst({ dur: 0.85, type: 'bandpass', f: 950, Q: 0.7, gain: 0.1, a: 0.22, verb: 0, pink: true });
+      this.noiseBurst({ dur: 0.45, type: 'bandpass', f: 1300, Q: 0.7, gain: 0.055, a: 0.12, t0: 0.55, verb: 0, pink: true });
+    }
     bandage() { for (let i = 0; i < 4; i++) this.noiseBurst({ dur: 0.18, type: 'bandpass', f: 3000 + i * 300, Q: 0.8, gain: 0.1, t0: i * 0.3, verb: 0 }); }
 
     // -------------------------------------------------------- impacts

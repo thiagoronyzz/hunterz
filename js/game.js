@@ -102,6 +102,7 @@
       shadowR: Math.min(q.shadowR, high ? 48 : 42),
       samples: 0,
       bloom: false,
+      ao: false,
       pixelRatio: Math.min(q.pixelRatio, 1.1),
     });
   }
@@ -135,8 +136,8 @@
   renderer.setPixelRatio(q.pixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  // PCF (without Soft) is much cheaper and reduces wide-filter "splotches" on leaves
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  // Soft, penumbra-like shadows read far more natural; low keeps cheap hard PCF
+  renderer.shadowMap.type = quality === 'low' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.autoClear = true;
   UI.scene.appendChild(renderer.domElement);
@@ -144,7 +145,8 @@
     event.preventDefault();
     showLoadError(new Error('The WebGL context was lost; try again in low quality.'));
   });
-  HZ.maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  // full anisotropy keeps bark/ground textures crisp at grazing angles
+  HZ.maxAniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
 
   const adaptedQuality = constrainedDevice && quality !== 'low';
   const textureQuality = constrainedDevice && quality === 'high' ? 'medium' : quality;
@@ -173,9 +175,9 @@
   const MAG = 5, RESERVE = 45, BASE_DMG = 62;
   const RKEY = 'hunterz-ranking-v3'; // v3: records carry a score, not just a time
   const P = {
-    pos: V(SPAWN.x, HZ.heightAt(SPAWN.x, SPAWN.z), SPAWN.z), vel: V(), knock: V(), yaw: 0, pitch: 0, onGround: true, crouch: false, crouchT: 0, sprinting: false,
+    pos: V(SPAWN.x, HZ.heightAt(SPAWN.x, SPAWN.z), SPAWN.z), vel: V(), knock: V(), yaw: 0, pitch: 0, yawT: 0, pitchT: 0, onGround: true, crouch: false, crouchT: 0, sprinting: false, sprintAmt: 0,
     hp: 100, hpLag: 100, stamina: 100, alive: true, lastHurt: -99, bandages: 3, bandaging: 0, bleeding: 0, noise: 0, moving: false, bobPhase: 0, moveAmt: 0,
-    eyeY: 0, shake: 0, hurt: 0, deathT: 0, killer: null, lastStep: 0, holdBreath: false, sprintLock: 0, eye: 1.68,
+    eyeY: 0, shake: 0, hurt: 0, deathT: 0, killer: null, lastStep: 0, holdBreath: false, sprintLock: 0, eye: 1.68, lean: 0, landDip: 0, breathCd: 0,
   };
   const S = {
     mode: 'loading', rain: false, rainAmt: 0, startTime: 0, elapsed: 0, shots: 0, hits: 0, kills: 0, total: 0, ammo: MAG, reserve: RESERVE,
@@ -268,10 +270,12 @@
   // When that happens the hunter falls back to hold-to-look: drag with the left button to
   // turn the head, quick tap to shoot, right button still scopes.
   let lockBlocked = false, drag = null;
+  // Aim is buffered on yawT/pitchT and eased toward every frame, which removes the
+  // raw 1:1 jitter of the mouse and makes turning feel fluid and cinematic.
   const look = (dx, dy) => {
-    const sens = 0.0021 * (camera.fov / 72);
-    P.yaw -= dx * sens; P.pitch -= dy * sens;
-    P.pitch = HZ.clamp(P.pitch, -1.48, 1.48);
+    const sens = 0.0024 * Math.max(0.2, camera.fov / 72);
+    P.yawT -= dx * sens; P.pitchT -= dy * sens;
+    P.pitchT = HZ.clamp(P.pitchT, -1.48, 1.48);
     S.lookDX += dx; S.lookDY += dy;
   };
   const useFallbackLook = () => {
@@ -328,7 +332,8 @@
   // ---------------------------------------------------------------- flow
   function resetPlayer() {
     P.pos.set(SPAWN.x, HZ.heightAt(SPAWN.x, SPAWN.z), SPAWN.z); P.vel.set(0, 0, 0); P.knock.set(0, 0, 0);
-    P.yaw = 0; P.pitch = 0; P.hp = 100; P.hpLag = 100; P.stamina = 100; P.alive = true; P.bandages = 3; P.bandaging = 0; P.bleeding = 0;
+    P.yaw = 0; P.pitch = 0; P.yawT = 0; P.pitchT = 0; P.lean = 0; P.landDip = 0; P.sprintAmt = 0; P.breathCd = 0;
+    P.hp = 100; P.hpLag = 100; P.stamina = 100; P.alive = true; P.bandages = 3; P.bandaging = 0; P.bleeding = 0;
     P.crouch = false; P.deathT = 0; P.hurt = 0; P.shake = 0; P.lastHurt = -99; P.eyeY = P.pos.y + 1.68;
     S.ammo = MAG; S.reserve = RESERVE; S.shots = 0; S.hits = 0; S.kills = 0; S.aim = 0; S.aimHeld = false; S.fire = false;
     S.lastSpottedT = -99; score.reset();
@@ -345,7 +350,7 @@
     updateAmmoUI(); updateAnimalUI();
     world.forceUpdate();
     lock();
-    toast('Careful: wolves, bears and boars can attack. Good hunting.', 3500);
+    toast('Careful: wolves and bears hunt you — and a wounded boar will charge. Good hunting.', 3800);
   }
   function restartGame() {
     effects.clear();
@@ -442,7 +447,7 @@
     if (rifle.state !== 'ready') return;
     if (S.ammo <= 0) { audio.dry(); hintBottom(S.reserve > 0 ? 'OUT OF AMMO · PRESS R' : 'OUT OF AMMO'); return; }
     S.ammo--; S.shots++; score.shotFired();
-    P.sprintLock = 0.35;
+    P.sprintLock = 0.22;
     rifle.fire(); audio.gunshot();
     camera.updateMatrixWorld();
     // spread: minimal when scoped; larger while moving/in the air
@@ -517,42 +522,48 @@
     const il = Math.hypot(ix, iz); if (il > 0) { ix /= il; iz /= il; }
     const shift = k.ShiftLeft || k.ShiftRight;
     P.sprintLock = Math.max(0, P.sprintLock - dt);
-    const wantSprint = shift && iz > 0.3 && !P.crouch && S.aim < 0.3 && P.stamina > 2 && P.bandaging <= 0 && rifle.state !== 'reloading' && P.sprintLock <= 0;
+    // sprint works in any forward-ish direction (strafe included), not only dead ahead
+    const wantMove = iz > 0.05 || Math.abs(ix) > 0.4;
+    const wantSprint = shift && wantMove && !P.crouch && S.aim < 0.3 && P.stamina > 1.5 && P.bandaging <= 0 && rifle.state !== 'reloading' && P.sprintLock <= 0;
     P.sprinting = wantSprint && P.onGround ? true : P.sprinting && wantSprint;
     const water = HZ.isWater(P.pos.x, P.pos.z, -0.25);
-    let speed = P.sprinting ? 6.3 : P.crouch ? 1.75 : 3.5;
-    if (S.aim > 0.3) speed = Math.min(speed, 1.9);
+    let speed = P.sprinting ? 7.2 : P.crouch ? 2.05 : 4.0;
+    if (S.aim > 0.3) speed = Math.min(speed, 2.2);
     if (P.bandaging > 0) speed = Math.min(speed, 1.4);
-    if (water) speed *= 0.55;
-    if (P.hp < 25) speed *= 0.85;
+    if (water) speed *= 0.62;
+    if (P.hp < 25) speed *= 0.88;
     const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
     const tx = (fx * iz + rx * ix) * speed, tz = (fz * iz + rz * ix) * speed;
-    const acc = P.onGround ? 11 : 2;
+    // high acceleration = responsive controls; the exponential approach keeps it silky
+    const acc = P.onGround ? 16 : 4;
     P.vel.x += (tx - P.vel.x) * Math.min(1, acc * dt); P.vel.z += (tz - P.vel.z) * Math.min(1, acc * dt);
     // jump
-    if (alive && k.Space && P.onGround && P.stamina > 8 && !P.crouch) { P.vel.y = 5.3; P.onGround = false; P.stamina -= 10; }
+    if (alive && k.Space && P.onGround && P.stamina > 4 && !P.crouch) { P.vel.y = 5.6; P.onGround = false; P.stamina -= 6; }
     if (alive && k.Space && P.crouch) P.crouch = false;
     P.vel.y -= 17 * dt;
     // knockback from attacks
     P.knock.multiplyScalar(Math.exp(-6 * dt));
     const mx = (P.vel.x + P.knock.x) * dt, mz = (P.vel.z + P.knock.z) * dt;
     const p = { x: P.pos.x, y: P.pos.y, z: P.pos.z };
-    const res = physics.moveCircle(p, mx, mz, 0.35, P.onGround ? 0.5 : 0.3, BOUND);
+    const res = physics.moveCircle(p, mx, mz, 0.35, P.onGround ? 0.55 : 0.3, BOUND);
     P.pos.x = p.x; P.pos.z = p.z;
     const g = res.ground;
     const ny = P.pos.y + P.vel.y * dt;
     if (ny <= g) {
-      if (!P.onGround && P.vel.y < -3) { audio.land(-P.vel.y); if (P.vel.y < -11) damagePlayer((-P.vel.y - 11) * 6, null, 0, 'fall'); P.shake = Math.min(1, P.shake + 0.2); }
+      if (!P.onGround && P.vel.y < -3) { audio.land(-P.vel.y); if (P.vel.y < -11) damagePlayer((-P.vel.y - 11) * 6, null, 0, 'fall'); P.shake = Math.min(1, P.shake + 0.2); P.landDip = Math.min(1, -P.vel.y / 12); }
       P.pos.y = g; P.vel.y = 0; P.onGround = true;
     } else if (P.onGround && P.vel.y <= 0 && P.pos.y - g < 0.55) { P.pos.y = g; P.vel.y = 0; }
     else { P.pos.y = ny; P.onGround = false; }
-    // stamina
-    if (P.sprinting && Math.hypot(P.vel.x, P.vel.z) > 3) { P.stamina -= 15 * dt; P.staminaT = 1; }
+    // stamina (recovers quickly so sprinting stays a tool, not a chore)
+    if (P.sprinting && Math.hypot(P.vel.x, P.vel.z) > 3) { P.stamina -= 12 * dt; P.staminaT = 1; }
     else if (P.holdBreath) P.stamina -= 20 * dt;
-    else { P.staminaT = (P.staminaT || 0) - dt; if (P.staminaT <= 0) P.stamina += 12 * dt; }
+    else { P.staminaT = (P.staminaT || 0) - dt; if (P.staminaT <= 0) P.stamina += 15 * dt; }
     P.stamina = HZ.clamp(P.stamina, 0, 100);
+    // out of breath: audible panting when the tank runs low
+    P.breathCd -= dt;
+    if (alive && P.stamina < 34 && P.breathCd <= 0) { P.breathCd = 3.4; audio.breath(); }
     // smooth crouch
-    P.crouchT += ((P.crouch ? 1 : 0) - P.crouchT) * Math.min(1, dt * 9);
+    P.crouchT += ((P.crouch ? 1 : 0) - P.crouchT) * Math.min(1, dt * 11);
     // footsteps and bobbing
     const hs = Math.hypot(P.vel.x, P.vel.z);
     P.moving = hs > 0.4;
@@ -580,16 +591,28 @@
 
   // ---------------------------------------------------------------- camera
   function updateCamera(dt) {
+    // eased head turn: the buffered aim glides instead of snapping to the raw mouse
+    const lk = 1 - Math.exp(-26 * dt);
+    P.yaw += (P.yawT - P.yaw) * lk;
+    P.pitch += (P.pitchT - P.pitch) * lk;
+    P.sprintAmt += ((P.sprinting ? 1 : 0) - P.sprintAmt) * Math.min(1, dt * 7);
     const eyeH = HZ.lerp(1.68, 1.08, P.crouchT);
     const target = P.pos.y + eyeH;
     // smooth steps (climbing rocks/logs) without delaying jumps
     if (Math.abs(target - P.eyeY) > 1.2) P.eyeY = target;
-    P.eyeY += (target - P.eyeY) * Math.min(1, dt * (P.onGround ? 14 : 30));
+    P.eyeY += (target - P.eyeY) * Math.min(1, dt * (P.onGround ? 16 : 30));
     let cx = P.pos.x, cy = P.eyeY, cz = P.pos.z;
     const bob = P.moveAmt * (1 - S.aim * 0.8);
-    cy += -Math.abs(Math.sin(P.bobPhase)) * 0.045 * bob * (P.sprinting ? 1.5 : 1) + 0.02 * bob;
-    const side = Math.cos(P.bobPhase) * 0.025 * bob;
+    // raised-cosine bob: no sharp corners at the bottom of each step
+    cy += -(0.5 - 0.5 * Math.cos(2 * P.bobPhase)) * 0.036 * bob * (P.sprinting ? 1.3 : 1) + 0.018 * bob;
+    const side = Math.cos(P.bobPhase) * 0.02 * bob;
     cx += Math.cos(P.yaw) * side; cz += -Math.sin(P.yaw) * side;
+    // knees absorb a landing; the body leans a touch into fast strafes
+    P.landDip *= Math.exp(-6 * dt);
+    cy -= P.landDip * 0.09;
+    const lat = P.vel.x * Math.cos(P.yaw) - P.vel.z * Math.sin(P.yaw);
+    const leanT = HZ.clamp(-lat * 0.01, -0.028, 0.028) * (1 - S.aim * 0.6);
+    P.lean += (leanT - P.lean) * Math.min(1, dt * 5);
     // camera recoil
     S.recoilPitch *= Math.exp(-9 * dt); S.recoilYaw *= Math.exp(-9 * dt);
     // scope sway (breathing, fatigue, movement)
@@ -615,12 +638,12 @@
       cy = HZ.lerp(P.eyeY, P.pos.y + 0.28, e); roll = e * 1.25; dp = e * 0.35;
     }
     camera.position.set(cx, cy, cz);
-    camera.rotation.set(P.pitch + S.recoilPitch + swy + shy + dp, P.yaw + S.recoilYaw + swx + shx, roll + Math.sin(P.bobPhase) * 0.004 * bob);
-    // FOV / scope
-    let fov;
-    if (S.aim < 0.85) fov = HZ.lerp(72, 56, S.aim / 0.85); else fov = 12;
-    if (P.sprinting) fov += 4;
-    if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+    camera.rotation.set(P.pitch + S.recoilPitch + swy + shy + dp, P.yaw + S.recoilYaw + swx + shx, roll + P.lean + Math.sin(P.bobPhase) * 0.003 * bob);
+    // FOV / scope — a continuous curve over the aim value, so zooming never snaps
+    const aimT = HZ.smooth(0.45, 1.0, S.aim);
+    let fov = HZ.lerp(72, 12, aimT);
+    fov += 4 * P.sprintAmt * (1 - aimT);
+    if (Math.abs(camera.fov - fov) > 0.02) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 13); camera.updateProjectionMatrix(); }
     camera.updateMatrixWorld();
     UI.scope.classList.toggle('on', scoped);
     UI.crosshair.classList.toggle('hide', scoped || P.sprinting || !P.alive);
@@ -735,7 +758,7 @@
       updatePlayer(dt);
       // scope aiming
       const canAim = S.aimHeld && P.alive && rifle.state !== 'reloading' && P.bandaging <= 0 && !P.sprinting;
-      S.aim = HZ.clamp(S.aim + (canAim ? 4.2 : -6) * dt, 0, 1);
+      S.aim = HZ.clamp(S.aim + (canAim ? 5.2 : -7.5) * dt, 0, 1);
       if (S.fire) { S.fire = false; if (P.sprinting) P.sprinting = false; shoot(); }
       updateCamera(dt);
       if (!P.alive && P.deathT > 2.2 && UI.death.classList.contains('hidden')) {

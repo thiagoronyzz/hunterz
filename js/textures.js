@@ -292,9 +292,15 @@
     T.fur = (() => {
       const c = pixelCanvas(256, 256, (u, v, x, y, o) => { const n = fbm(u * 16, v * 4, 3, 181, 16); const g = 200 + n * 30; o[0] = o[1] = o[2] = clamp255(g); });
       const ctx = c.getContext('2d'), r = rng(182);
-      for (let i = 0; i < 9000; i++) {
+      for (let i = 0; i < 12500; i++) {
         const x = r() * 256, y = r() * 256, l = 3 + r() * 7, a = Math.PI / 2 + (r() - 0.5) * 0.5, g = 150 + r() * 105;
         ctx.strokeStyle = rgb(g, g, g, 0.5); ctx.lineWidth = 0.7;
+        wrap(ctx, 256, 256, x, y, l, (px, py) => { ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); ctx.stroke(); });
+      }
+      // finer guard hairs on top for a less "painted" coat
+      for (let i = 0; i < 4200; i++) {
+        const x = r() * 256, y = r() * 256, l = 2 + r() * 4, a = Math.PI / 2 + (r() - 0.5) * 0.7, g = 120 + r() * 130;
+        ctx.strokeStyle = rgb(g, g, g, 0.32); ctx.lineWidth = 0.5;
         wrap(ctx, 256, 256, x, y, l, (px, py) => { ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); ctx.stroke(); });
       }
       return c;
