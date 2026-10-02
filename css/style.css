@@ -114,3 +114,71 @@ body{font-family:Manrope,"Segoe UI",system-ui,sans-serif}
 .hint-bottom{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);font:600 10px Manrope;letter-spacing:.14em;color:#fff;text-shadow:0 2px 6px #000;opacity:0;transition:opacity .3s}
 .hint-bottom.show{opacity:1}
 @media (max-width:900px){.vitals{bottom:190px;width:200px}.controls-reminder{display:none}}
+
+/* ======================== mobile / touch play ======================== */
+html,body,#game{height:100%;height:100dvh;overscroll-behavior:none}
+canvas{touch-action:none}
+.mobile-hint{display:none}
+.touch-controls{position:absolute;inset:0;z-index:8;display:none;pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+.touch-controls.touch-enabled.touch-live{display:block}
+.touch-controls button{pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
+.touch-pause{position:absolute;top:max(10px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));width:42px;height:38px;border:1px solid rgba(255,255,255,.36);border-radius:4px;background:rgba(5,12,7,.55);color:#f2f4ec;font:700 17px/1 Manrope;backdrop-filter:blur(8px)}
+.touch-stick{position:absolute;left:max(12px,env(safe-area-inset-left));bottom:calc(env(safe-area-inset-bottom) + 12px);width:128px;height:128px;border-radius:50%;pointer-events:auto;touch-action:none;background:radial-gradient(circle,rgba(7,15,10,.04) 35%,rgba(7,15,10,.17) 67%,rgba(7,15,10,.4) 100%)}
+.touch-stick__track{position:absolute;inset:4px;border:1px solid rgba(240,245,231,.35);border-radius:50%;box-shadow:inset 0 0 22px rgba(0,0,0,.32);pointer-events:none}
+.touch-stick__track:before,.touch-stick__track:after{content:"";position:absolute;left:50%;top:50%;background:rgba(240,245,231,.13);transform:translate(-50%,-50%)}
+.touch-stick__track:before{width:1px;height:76%}.touch-stick__track:after{height:1px;width:76%}
+.touch-stick__knob{position:absolute;left:50%;top:50%;width:50px;height:50px;border:1px solid rgba(255,255,255,.62);border-radius:50%;background:radial-gradient(circle at 38% 34%,rgba(222,232,211,.48),rgba(52,68,51,.55) 72%);box-shadow:0 4px 14px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none}
+.touch-stick__label{position:absolute;left:50%;bottom:13px;transform:translateX(-50%);color:rgba(255,255,255,.48);font:700 7px Manrope;letter-spacing:.18em;pointer-events:none}
+.touch-actions{position:absolute;right:max(12px,env(safe-area-inset-right));bottom:calc(env(safe-area-inset-bottom) + 12px);display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,48px);gap:6px;pointer-events:none}
+.touch-action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-width:46px;min-height:46px;padding:3px;border:1px solid rgba(255,255,255,.38);border-radius:50%;background:rgba(5,12,7,.58);color:#f2f4ec;text-shadow:0 1px 3px #000;box-shadow:0 3px 12px rgba(0,0,0,.25);backdrop-filter:blur(8px);pointer-events:auto;transition:background .12s,border-color .12s,transform .12s}
+.touch-action span{font:600 17px/1 Manrope}.touch-action small{font:700 6px/1 Manrope;letter-spacing:.08em}
+.touch-action:active,.touch-action.active{background:rgba(183,214,75,.88);border-color:#e2f69b;color:#10170b;text-shadow:none;transform:scale(.96)}
+.touch-action--fire{grid-column:3;grid-row:1 / span 2;width:54px;height:102px;align-self:center;border-radius:28px;border-color:rgba(243,183,154,.72);background:linear-gradient(150deg,rgba(117,37,25,.8),rgba(48,13,10,.78));color:#ffece2}
+.touch-action--fire span{font-size:20px}.touch-action--fire:active{background:rgba(215,70,47,.92);border-color:#ffd0bb;color:#fff}
+@media (any-pointer:coarse),(max-width:700px){
+  #topbar{height:56px;padding:9px 12px;grid-template-columns:auto 1fr auto;align-items:center}
+  .brand-mini{gap:6px;font-size:10px;letter-spacing:.13em}.brand-mark{width:21px;height:21px;font-size:14px}
+  .mission{min-width:0;padding:0 7px}.mission__eyebrow{display:none}.mission strong{max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}
+  .weather-chip{display:none}
+  .compass{top:59px;width:126px;font-size:8px}
+  .compass strong{font-size:12px}
+  .contracts{left:8px;top:79px;width:min(170px,44vw);max-height:134px;overflow:auto;padding:7px 8px}
+  .contracts__head{font-size:7px}.contracts li{padding:4px 0 4px 12px;font-size:7px}.contracts li em{font-size:6px}
+  .status-panel{left:auto;right:8px;top:79px;bottom:auto;width:104px;padding:5px 7px}
+  .status-line{padding:3px 0;font-size:6px;letter-spacing:.06em}.status-line strong{font-size:11px}
+  .sound-meter{display:none}
+  .threat{top:135px;padding:5px 9px;font-size:7px;letter-spacing:.15em}
+  .kill-feed{right:7px;top:150px;gap:3px}.kill-feed div{padding:4px 7px;font-size:7px}
+  .vitals{left:10px;bottom:calc(env(safe-area-inset-bottom) + 156px);width:132px;gap:4px}
+  .vital-row{gap:5px}.vital-row .ico{width:12px;font-size:10px}.bar{height:8px}.vital-row strong{min-width:22px;font-size:11px}
+  .bandages{gap:5px;font-size:6px;letter-spacing:.08em}.bandages b{padding:1px 5px;font-size:10px}.bandages kbd{padding:1px 3px;font-size:7px}
+  .ammo-panel{right:8px;bottom:calc(env(safe-area-inset-bottom) + 164px);min-width:0;width:104px;padding:6px 7px}
+  .weapon-name{max-width:100%;overflow:hidden;white-space:nowrap;font-size:6px;letter-spacing:.06em}
+  .ammo strong{font-size:28px}.ammo span{font-size:10px}.ammo-dots{gap:3px;margin:3px 0}.ammo-dots i{width:2px;height:10px}#reloadHint{font-size:6px;letter-spacing:.08em}
+  .controls-reminder{display:none}.hint-bottom{bottom:calc(env(safe-area-inset-bottom) + 150px);font-size:8px;letter-spacing:.08em;white-space:nowrap}
+  .dmg-dir{width:170px;height:170px;margin:-85px 0 0 -85px}
+  .start-screen:before{background:rgba(2,7,4,.48)}
+  .menu-card{width:min(480px,calc(100% - 22px));margin-right:0;padding:20px 20px 16px;max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 26px);overflow:auto}
+  .menu-brand__line{margin-bottom:9px}.menu-brand p{font-size:7px}.menu-brand h1{font-size:clamp(54px,14vw,78px)}.menu-brand .tagline{font-size:9px}
+  .menu-actions{margin-top:15px}.primary-button{padding:12px 14px}.primary-button span{font-size:14px}.primary-button small{font-size:8px}
+  .setting-row{padding:8px 2px}.setting-row strong{font-size:9px}.setting-row small{font-size:7px}.quality-row select,.menu-select{padding:5px;font-size:8px}
+  .volume-row input{width:82px}.mini-ranking{margin-top:7px}.mini-ranking summary{padding:7px 9px;font-size:7px}
+  .menu-footer{display:none}.mobile-hint{display:block;margin:13px 0 0;text-align:center;font:700 7px Manrope;letter-spacing:.12em;color:rgba(232,238,226,.62)}
+  .ethics{left:8px;bottom:calc(env(safe-area-inset-bottom) + 5px);font-size:5px}
+  .pause-card,.death-card{max-height:calc(100dvh - 28px);overflow:auto}
+  .result-card{max-height:calc(100dvh - 24px);padding:22px 18px}
+}
+@media (max-width:380px){
+  .touch-stick{width:116px;height:116px}.touch-actions{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:5px}.touch-action{min-width:42px;min-height:42px}.touch-action--fire{width:49px;height:93px}
+  .contracts{width:min(156px,43vw)}.status-panel{width:96px}.ammo-panel{width:96px}
+}
+@media (any-pointer:coarse) and (max-height:520px){
+  #topbar{height:45px;padding-top:5px;padding-bottom:5px}.compass{top:47px}.contracts,.status-panel{top:65px}.contracts{max-height:88px}
+  .threat{top:110px}.kill-feed{top:122px}
+  .touch-stick{width:96px;height:96px;bottom:calc(env(safe-area-inset-bottom) + 7px)}.touch-stick__knob{width:40px;height:40px}.touch-stick__label{bottom:8px;font-size:6px}
+  .touch-actions{grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px);gap:4px;bottom:calc(env(safe-area-inset-bottom) + 7px)}
+  .touch-action{min-width:38px;min-height:38px}.touch-action span{font-size:14px}.touch-action small{font-size:5px}.touch-action--fire{width:44px;height:84px}
+  .vitals{bottom:calc(env(safe-area-inset-bottom) + 111px);width:112px}.ammo-panel{bottom:calc(env(safe-area-inset-bottom) + 116px)}
+  .hint-bottom{bottom:calc(env(safe-area-inset-bottom) + 108px)}
+  .menu-card{padding:14px 18px 12px;max-height:calc(100dvh - 18px)}.menu-brand h1{font-size:56px}.menu-actions{margin-top:9px}.setting-row{padding:6px 2px}
+}

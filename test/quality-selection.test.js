@@ -1,8 +1,7 @@
-/* Exercises js/game.js: quality selection (including the legacy pt-BR ids mapped
-   through QUALITY_ALIASES), the translated loading/error strings and the
-   "load in low quality" retry handler. Runs the real js/*.js files in a stubbed
-   DOM + THREE sandbox (see harness.js); the GPU-bound world/texture generation is
-   stubbed here and covered by textures.test.js. */
+/* Exercises js/game.js: quality selection, touch-device detection and virtual
+   joystick/action handlers, plus loading/error strings and the low-quality retry.
+   Runs real modules in the stubbed DOM + THREE sandbox (see harness.js); GPU-bound
+   world and texture generation is covered separately by textures.test.js. */
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const boot = require('./harness.js');
 const ROOT = path.join(__dirname, '..');
@@ -64,11 +63,48 @@ const check = (name, got, want) => {
     ['mobile default',        { mobile: true },            'low'],
     ['desktop default',       {},                          'medium'],
   ];
+  let mobileRun = null;
   for (const [name, opts, want] of cases) {
     const r = run(opts);
     await wait(120);
     check(name + ' -> quality', r.el.get('qualitySelect').value, want);
+    if (name === 'mobile default') {
+      mobileRun = r;
+      check('mobile touch controls detected', r.el.get('touchControls').classList.contains('touch-enabled'), true);
+    }
   }
+
+  // exercise real touch handlers from the game module using touch-like pointer events
+  await wait(300);
+  const MG = mobileRun.sb.HZ.game;
+  MG.startGame();
+  const pointer = (pointerId, x = 0, y = 0) => ({ pointerType: 'touch', pointerId, clientX: x, clientY: y, preventDefault() {} });
+  const call = (id, type, event) => {
+    const entry = mobileRun.listeners.filter(([name]) => name === `${id}:${type}`).pop();
+    if (!entry) throw new Error(`missing touch handler ${id}:${type}`);
+    entry[1](event);
+  };
+  call('touchFire', 'pointerdown', pointer(1));
+  check('touch fire queues a shot', MG.S.fire, true);
+  call('touchAim', 'pointerdown', pointer(2));
+  check('touch aim toggles scope', MG.S.aimHeld, true);
+  call('touchCrouch', 'pointerdown', pointer(5));
+  check('touch crouch toggles stance', MG.P.crouch, true);
+  call('touchJump', 'pointerdown', pointer(6));
+  check('touch jump queues one hop', MG.S.touchJump, true);
+  call('touchBreath', 'pointerdown', pointer(7));
+  check('touch breath hold is active', MG.S.touchBreath, true);
+  call('touchBreath', 'pointerup', pointer(7));
+  check('touch breath releases', MG.S.touchBreath, false);
+  call('touchSprint', 'pointerdown', pointer(3));
+  check('sprint stays active while pressed', MG.S.touchSprint, true);
+  call('touchSprint', 'pointerup', pointer(3));
+  check('sprint releases on touch up', MG.S.touchSprint, false);
+  mobileRun.el.get('touchStick').getBoundingClientRect = () => ({ left: 0, top: 0, width: 128, height: 128 });
+  call('touchStick', 'pointerdown', pointer(4, 96, 64));
+  check('joystick produces smooth analog input', MG.S.touchMove.x > 0.7 && MG.S.touchMove.x < 0.8, true);
+  call('touchStick', 'pointerup', pointer(4, 96, 64));
+  check('joystick centers after release', MG.S.touchMove.x === 0 && MG.S.touchMove.y === 0, true);
 
   // happy path: translated loading messages and the final "Ready"
   const ok = run({ search: '?q=low' });
